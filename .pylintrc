@@ -1,6 +1,6 @@
 [MASTER]
 
-init-hook='import sys; sys.path.append("./src")'
+init-hook='import sys; sys.path.append("./")'
 
 # A comma-separated list of package or module names from where C extensions may
 # be loaded. Extensions are loading into the active Python interpreter and may
@@ -62,13 +62,13 @@ confidence=
 # --enable=similarities". If you want to run only the classes checker, but have
 # no Warning level messages displayed, use "--disable=all --enable=classes
 # --disable=W".
-disable=
+disable=suppressed-message
 
 # Enable the message, report, category or checker with the given id(s). You can
 # either give multiple identifier separated by comma (,) or put this option
 # multiple time (only on the command line, not in the configuration file where
 # it should appear only once). See also the "--disable" option for examples.
-enable=all
+#enable=all
 
 
 [REPORTS]
