@@ -7,7 +7,7 @@ from typing import Set
 
 import pandas as pd
 
-from security import Stock
+from aqua.security import Stock
 
 
 class IMarketData(ABC):
@@ -16,14 +16,14 @@ class IMarketData(ABC):
     """
 
     @abstractmethod
-    def get_stocks_by_symbol(self, symbol: str) -> Set[Stock]:
+    async def get_stocks_by_symbol(self, symbol: str) -> Set[Stock]:
         """
         Searches for a set of stocks with a given symbol.
         @return: a set of Stock instances with a given symbol.
         """
 
     @abstractmethod
-    def get_stock_bar_history(
+    async def get_stock_bar_history(
         self,
         stock: Stock,
         start: pd.Timestamp,
@@ -31,6 +31,15 @@ class IMarketData(ABC):
         bar_size: pd.Timedelta,
     ) -> pd.DataFrame:
         """
-        Returns the bar history for a particular stock (unadjusted for splits and dividends)
-        @return: a pandas DataFrame with columns "Open", "High", "Low", and "Close"
+        Returns the bar history for a particular stock (unadjusted for splits)
+        @return: a pandas DataFrame with columns "Open", "High", "Low", "Close", and "Volume".
+        Note that some market data sources may provide extra columns such as volume weighted
+        average
         """
+
+
+class DataSourceError(Exception):
+    """
+    Data source error occurs when the data source (polygon, ibkr, etc.)
+    service returns an error for a given request
+    """
