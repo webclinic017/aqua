@@ -2,11 +2,11 @@
 Polygon.io market data
 """
 
-from typing import Set
+import logging
 import os
-import sys
-
 import urllib.parse
+from typing import Set
+
 import aiohttp
 import pandas as pd
 from dotenv import load_dotenv
@@ -14,17 +14,17 @@ from dotenv import load_dotenv
 from aqua.market_data import _market_data
 from aqua.security import Stock
 
+logger = logging.getLogger(__name__)
 
 if not load_dotenv():
-    print("Can't load environment variable", file=sys.stderr)
-    sys.exit(1)
+    logger.warning("Can't load dotenv file")
 
 _POLYGON_URL = "https://api.polygon.io"
 _POLYGON_API_KEY = os.getenv("POLYGON_API_KEY")
 
 if _POLYGON_API_KEY is None:
-    print("Can't load polygon api key")
-    sys.exit(1)
+    logger.fatal("Can't load polygon api key")
+    raise _market_data.CredentialError
 
 
 class PolygonMarketData(_market_data.IMarketData):
@@ -37,7 +37,7 @@ class PolygonMarketData(_market_data.IMarketData):
             headers={"Authorization": f"Bearer {_POLYGON_API_KEY}"}
         )
 
-    async def __aenter__(self) -> None:
+    async def __aenter__(self) -> "PolygonMarketData":
         return self
 
     async def __aexit__(self, *exec_info) -> None:
@@ -52,6 +52,7 @@ class PolygonMarketData(_market_data.IMarketData):
         )
         results = set()
         while next_url is not None:
+            logger.debug("Loading %s", next_url)
             async with self.session.get(next_url) as response:
                 if response.status != 200:
                     raise _market_data.DataSourceError
@@ -59,6 +60,7 @@ class PolygonMarketData(_market_data.IMarketData):
                 for stock in response["results"]:
                     results.add(Stock(stock["ticker"]))
                 if "next_url" in response:
+                    logger.debug("Found next url")
                     next_url = response["next_url"]
                 else:
                     next_url = None
@@ -85,17 +87,26 @@ class PolygonMarketData(_market_data.IMarketData):
             assert units == "minute"
             periods = list(pd.date_range(start, end, freq=pd.DateOffset(days=100)))
         periods.append(end + pd.DateOffset(days=1))
+        logger.debug("Broke up request into %d periods", len(periods))
         for i in range(len(periods) - 1):
             period_start = periods[i]
             period_end = periods[i + 1] - pd.DateOffset(days=1)
-            path = (
-                "/v2/aggs"
-                + f"/ticker/{stock.symbol}"
-                + f"/range/{range_multiplier}/{units}"
-                + f"/{period_start.strftime('%Y-%m-%d')}/{period_end.strftime('%Y-%m-%d')}"
+            logger.debug(
+                "Fetching period %s to %s",
+                period_start.strftime("%Y-%m-%d"),
+                period_end.strftime("%Y-%m-%d"),
             )
             url = (
-                urllib.parse.urljoin(_POLYGON_URL, path)
+                urllib.parse.urljoin(
+                    _POLYGON_URL,
+                    (
+                        "/v2/aggs"
+                        + f"/ticker/{stock.symbol}"
+                        + f"/range/{range_multiplier}/{units}"
+                        + f"/{period_start.strftime('%Y-%m-%d')}"
+                        + f"/{period_end.strftime('%Y-%m-%d')}"
+                    ),
+                )
                 + "?"
                 + urllib.parse.urlencode({"limit": 50000, "adjusted": False})
             )
@@ -107,6 +118,7 @@ class PolygonMarketData(_market_data.IMarketData):
                 if "results" in response:
                     raw_res.append(pd.DataFrame(response["results"]))
                 else:
+                    logger.info("Got empty response for request %s", url)
                     raw_res.append(pd.DataFrame())
 
         raw_res = pd.concat(raw_res)
