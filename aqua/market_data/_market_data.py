@@ -36,16 +36,3 @@ class IMarketData(ABC):
         Note that some market data sources may provide extra columns such as volume weighted
         average
         """
-
-
-class DataSourceError(Exception):
-    """
-    Data source error occurs when the data source (polygon, ibkr, etc.)
-    service returns an error for a given request
-    """
-
-
-class CredentialError(Exception):
-    """
-    Credential error occurs when the data source does not have permission to access the desired data
-    """

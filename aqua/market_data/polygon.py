@@ -12,6 +12,7 @@ import pandas as pd
 from dotenv import load_dotenv
 
 from aqua.market_data import _market_data
+from aqua.market_data import errors
 from aqua.security import Stock
 
 logger = logging.getLogger(__name__)
@@ -24,7 +25,7 @@ _POLYGON_API_KEY = os.getenv("POLYGON_API_KEY")
 
 if _POLYGON_API_KEY is None:
     logger.fatal("Can't load polygon api key")
-    raise _market_data.CredentialError
+    raise errors.CredentialError
 
 
 class PolygonMarketData(_market_data.IMarketData):
@@ -55,7 +56,7 @@ class PolygonMarketData(_market_data.IMarketData):
             logger.debug("Loading %s", next_url)
             async with self.session.get(next_url) as response:
                 if response.status != 200:
-                    raise _market_data.DataSourceError
+                    raise errors.DataSourceError
                 response = await response.json()
                 for stock in response["results"]:
                     results.add(Stock(stock["ticker"]))
@@ -113,7 +114,7 @@ class PolygonMarketData(_market_data.IMarketData):
             async with self.session.get(url) as response:
                 if response.status != 200:
                     print("Error: {}".format(await response.json()))
-                    raise _market_data.DataSourceError
+                    raise errors.DataSourceError
                 response = await response.json()
                 if "results" in response:
                     raw_res.append(pd.DataFrame(response["results"]))
