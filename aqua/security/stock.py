@@ -16,7 +16,7 @@ class Stock:
         if isinstance(o, Stock):
             return self.symbol == o.symbol
         if isinstance(o, str):
-            return self.symbol == o
+            return self.symbol == o.upper()
         return NotImplemented
 
     def __hash__(self) -> int:

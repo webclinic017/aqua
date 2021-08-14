@@ -11,7 +11,7 @@ import aiohttp
 import pandas as pd
 from dotenv import load_dotenv
 
-from aqua.market_data import _market_data
+from aqua.market_data import _market_data_interface
 from aqua.market_data import errors
 from aqua.security import Stock
 
@@ -28,7 +28,7 @@ if _POLYGON_API_KEY is None:
     raise errors.CredentialError
 
 
-class PolygonMarketData(_market_data.IMarketData):
+class PolygonMarketData(_market_data_interface.IMarketData):
     """
     Polygon market data gets market data from polygon.io asynchronously
     """
