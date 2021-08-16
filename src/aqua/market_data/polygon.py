@@ -85,7 +85,7 @@ class PolygonMarketData(market_data_interface.IMarketData):
             periods = list(pd.date_range(start, end, freq=pd.DateOffset(days=50000)))
         else:
             assert units == "minute"
-            periods = list(pd.date_range(start, end, freq=pd.DateOffset(days=100)))
+            periods = list(pd.date_range(start, end, freq=pd.DateOffset(days=75)))
         periods.append(end + pd.DateOffset(days=1))
         logger.debug("Broke up request into %d periods", len(periods))
         for i in range(len(periods) - 1):
