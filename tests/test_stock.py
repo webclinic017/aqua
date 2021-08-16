@@ -7,6 +7,7 @@ def test_stock_equality():
     stk2 = security.Stock("aapl")
     assert stk1 == stk2
 
+
 def test_stock_string_equality():
     stk1 = security.Stock("AAPL")
     assert stk1 == "aapl"

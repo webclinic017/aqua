@@ -2,6 +2,7 @@
 Provides common errors/exceptions for market data sources
 """
 
+
 class DataSourceError(Exception):
     """
     Data source error occurs when the data source (polygon, ibkr, etc.)
