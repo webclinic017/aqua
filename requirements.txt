@@ -4,7 +4,7 @@
 # aqua/market_data/polygon.py: 10
 aiohttp == 3.7.4.post0
 
-# aqua/market_data/_market_data_interface.py: 8
+# aqua/market_data/market_data_interface.py: 8
 # aqua/market_data/alpaca.py: 11
 # aqua/market_data/polygon.py: 11
 pandas == 1.3.2

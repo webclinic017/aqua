@@ -11,7 +11,7 @@ import aiohttp
 import pandas as pd
 from dotenv import load_dotenv
 
-from aqua.market_data import _market_data_interface, errors
+from aqua.market_data import market_data_interface, errors
 from aqua.security import Stock
 
 logger = logging.getLogger(__name__)
@@ -29,7 +29,7 @@ if _ALPACA_KEY_ID is None or _ALPACA_SECRET_KEY is None:
     raise errors.CredentialError
 
 
-class AlpacaMarketData(_market_data_interface.IMarketData):
+class AlpacaMarketData(market_data_interface.IMarketData):
     """
     Alpaca market data gets market data from alpaca asynchronously
     """
