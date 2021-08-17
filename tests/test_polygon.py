@@ -2,7 +2,7 @@
 import pandas as pd
 import pytest
 
-from aqua.market_data.polygon import PolygonMarketData
+from aqua.market_data import PolygonMarketData
 from aqua.security import Stock
 
 

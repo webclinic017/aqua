@@ -2,7 +2,7 @@
 import pandas as pd
 import pytest
 
-from aqua.market_data.alpaca import AlpacaMarketData
+from aqua.market_data import AlpacaMarketData
 from aqua.security import Stock
 
 
