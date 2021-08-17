@@ -1,8 +1,8 @@
+# pylint: disable=unused-argument
 """
 An abstract base class for MarketData instances.
 A MarketData class is used for fetching live and historical market data.
 """
-from abc import ABC, abstractmethod
 from typing import Set
 
 import pandas as pd
@@ -10,19 +10,18 @@ import pandas as pd
 from aqua.security import Stock
 
 
-class IMarketData(ABC):
+class IMarketData:
     """
-    Abstract base class for market data.
+    Base class for market data.
     """
 
-    @abstractmethod
     async def get_stocks_by_symbol(self, symbol: str) -> Set[Stock]:
         """
         Searches for a set of stocks with a given symbol.
         @return: a set of Stock instances with a given symbol.
         """
+        return NotImplemented
 
-    @abstractmethod
     async def get_stock_bar_history(
         self,
         stock: Stock,
@@ -36,3 +35,18 @@ class IMarketData(ABC):
         Note that some market data sources may provide extra columns such as volume weighted
         average
         """
+        return NotImplemented
+
+    async def get_stock_dividends(self, stock: Stock) -> pd.DataFrame:
+        """
+        Returns the dividend history of a stock
+        @return: a pandas DataFrame with columns "Amount", "ExDate", "PaymentDate", "RecordDate"
+        """
+        return NotImplemented
+
+    async def get_stock_splits(self, stock: Stock) -> pd.DataFrame:
+        """
+        Returns the split history of a stock
+        @return: a pandas DataFrame with columns "Ratio", "ExDate",
+        """
+        return NotImplemented

@@ -41,3 +41,23 @@ async def test_get_bar_history_for_spy():
         assert "High" in res.columns
         assert "Low" in res.columns
         assert "Close" in res.columns
+
+
+@pytest.mark.asyncio
+@pytest.mark.market_data
+async def test_get_dividends_for_aapl():
+    async with PolygonMarketData() as pmd:
+        res = await pmd.get_stock_dividends(Stock("AAPL"))
+        assert not res.empty
+        print()
+        print(res.head())
+
+
+@pytest.mark.asyncio
+@pytest.mark.market_data
+async def test_get_splits_for_aapl():
+    async with PolygonMarketData() as pmd:
+        res = await pmd.get_stock_splits(Stock("AAPL"))
+        assert not res.empty
+        print()
+        print(res.head())

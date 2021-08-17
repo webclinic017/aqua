@@ -112,7 +112,7 @@ class PolygonMarketData(market_data_interface.IMarketData):
             )
             async with self.session.get(url) as response:
                 if response.status != 200:
-                    print("Error: {}".format(await response.json()))
+                    logger.warning("Error: %s", await response.json())
                     raise errors.DataSourceError
                 response = await response.json()
                 if "results" in response:
@@ -142,3 +142,33 @@ class PolygonMarketData(market_data_interface.IMarketData):
             }
         )
         return res
+
+    async def get_stock_dividends(self, stock: Stock) -> pd.DataFrame:
+        path = f"/v2/reference/dividends/{urllib.parse.quote_plus(stock.symbol)}"
+        url = urllib.parse.urljoin(_POLYGON_URL, path)
+        async with self.session.get(url) as response:
+            if response.status != 200:
+                raise errors.DataSourceError
+            response = await response.json()
+            res = pd.DataFrame(response["results"])
+        res.rename(
+            columns={
+                "amount": "Amount",
+                "exDate": "ExDate",
+                "paymentDate": "PaymentDate",
+                "recordDate": "RecordDate",
+            },
+            inplace=True,
+        )
+        return res[["Amount", "ExDate", "PaymentDate", "RecordDate"]]
+
+    async def get_stock_splits(self, stock: Stock) -> pd.DataFrame:
+        path = f"/v2/reference/splits/{urllib.parse.quote_plus(stock.symbol)}"
+        url = urllib.parse.urljoin(_POLYGON_URL, path)
+        async with self.session.get(url) as response:
+            if response.status != 200:
+                raise errors.DataSourceError
+            response = await response.json()
+            res = pd.DataFrame(response["results"])
+        res.rename(columns={"ratio": "Ratio", "exDate": "ExDate"}, inplace=True)
+        return res[["Ratio", "ExDate"]]
