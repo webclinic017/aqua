@@ -11,7 +11,7 @@ import aiohttp
 import pandas as pd
 from dotenv import load_dotenv
 
-from aqua.market_data import market_data_interface, errors
+from aqua.market_data import errors, market_data_interface
 from aqua.security import Stock
 
 logger = logging.getLogger(__name__)

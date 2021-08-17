@@ -11,7 +11,7 @@ import aiohttp
 import pandas as pd
 from dotenv import load_dotenv
 
-from aqua.market_data import market_data_interface, errors
+from aqua.market_data import errors, market_data_interface
 from aqua.security import Stock
 
 logger = logging.getLogger(__name__)
@@ -76,6 +76,7 @@ class AlpacaMarketData(market_data_interface.IMarketData):
             raise ValueError(
                 "Alpaca only supports bar sizes of 1 min, 1 hour, or 1 day"
             )
+        end += bar_size  # make sure we include the last bar
         if start.tz is None:
             start = start.tz_localize("America/New_York")
         if end.tz is None:
