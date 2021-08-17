@@ -6,7 +6,7 @@ Defines a stock contract
 class Stock:
     """
     A stock represents a share of a company or index.
-    We assume that it can be uniquely defined by a symbol (ticker) and ISIN.
+    We assume that it can be uniquely defined by a symbol (ticker).
     """
 
     def __init__(self, symbol: str) -> None:
