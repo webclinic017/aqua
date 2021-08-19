@@ -7,7 +7,7 @@ from typing import Set
 
 import pandas as pd
 
-from aqua.security import Stock
+from aqua.security import Option, Stock
 
 
 class IMarketData:
@@ -48,5 +48,20 @@ class IMarketData:
         """
         Returns the split history of a stock
         @return: a pandas DataFrame with columns "Ratio", "ExDate",
+        """
+        return NotImplemented
+
+    async def get_option_bar_history(
+        self,
+        option: Option,
+        start: pd.Timestamp,
+        end: pd.Timestamp,
+        bar_size: pd.Timedelta,
+    ) -> pd.DataFrame:
+        """
+        Returns the bar history of an option
+        @return: a pandas DataFrame with columns "Open", "High", "Low", "Close", and "Volume".
+        Note that some market data sources may provide extra columns such as volume weighted
+        average
         """
         return NotImplemented

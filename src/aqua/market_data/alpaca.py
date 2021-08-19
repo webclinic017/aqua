@@ -19,10 +19,14 @@ logger = logging.getLogger(__name__)
 if not load_dotenv():
     logger.warning("Can't load dotenv file")
 
-_ALPACA_URL = "https://paper-api.alpaca.markets"
-_ALPACA_DATA_URL = "https://data.alpaca.markets/v2"
+_ALPACA_URL = os.getenv("ALPACA_URL")
+_ALPACA_DATA_URL = os.getenv("ALPACA_DATA_URL")
 _ALPACA_KEY_ID = os.getenv("ALPACA_KEY_ID")
 _ALPACA_SECRET_KEY = os.getenv("ALPACA_SECRET_KEY")
+
+if _ALPACA_URL is None or _ALPACA_DATA_URL is None:
+    logger.fatal("Unable to load Alpaca urls")
+    raise errors.ConfigError
 
 if _ALPACA_KEY_ID is None or _ALPACA_SECRET_KEY is None:
     logger.fatal("Can't load alpaca keys")

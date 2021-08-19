@@ -19,8 +19,12 @@ logger = logging.getLogger(__name__)
 if not load_dotenv():
     logger.warning("Can't load dotenv file")
 
-_POLYGON_URL = "https://api.polygon.io"
+_POLYGON_URL = os.getenv("POLYGON_URL")
 _POLYGON_API_KEY = os.getenv("POLYGON_API_KEY")
+
+if _POLYGON_URL is None:
+    logger.fatal("Unable to load Polygon url")
+    raise errors.ConfigError
 
 if _POLYGON_API_KEY is None:
     logger.fatal("Can't load polygon api key")
