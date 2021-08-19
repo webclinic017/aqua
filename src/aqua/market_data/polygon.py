@@ -5,7 +5,7 @@ Polygon.io market data
 import logging
 import os
 import urllib.parse
-from typing import Set
+from typing import Set, Optional
 
 import aiohttp
 import pandas as pd
@@ -37,15 +37,17 @@ class PolygonMarketData(market_data_interface.IMarketData):
     """
 
     def __init__(self) -> None:
+        self.session: Optional[aiohttp.ClientSession] = None
+
+    async def __aenter__(self) -> "PolygonMarketData":
         self.session = aiohttp.ClientSession(
             headers={"Authorization": f"Bearer {_POLYGON_API_KEY}"}
         )
-
-    async def __aenter__(self) -> "PolygonMarketData":
         return self
 
     async def __aexit__(self, *exec_info) -> None:
         await self.session.close()
+        self.session = None
 
     async def get_stocks_by_symbol(self, symbol: str) -> Set[Stock]:
         path = "/v3/reference/tickers"
