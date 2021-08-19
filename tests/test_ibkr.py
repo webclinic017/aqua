@@ -13,7 +13,7 @@ async def test_get_option_prices():
         res = await market_data.get_option_bar_history(
             Option(
                 Stock("SPY"),
-                pd.Timestamp("2021-08-20"),
+                pd.Timestamp("2021-12-31"),
                 440,
                 Option.Parity.CALL,
                 Option.Type.AMERICAN,
@@ -23,6 +23,5 @@ async def test_get_option_prices():
             pd.Timedelta(1, unit="hr"),
         )
         assert not res.empty
-        print()
-        print(res)
-        print(res.index.min(), res.index.max())
+        assert res.index.min() <= pd.Timestamp("2021-08-11", tz="America/New_York")
+        assert res.index.max() >= pd.Timestamp("2021-08-12", tz="America/New_York")

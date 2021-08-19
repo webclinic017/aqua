@@ -142,6 +142,7 @@ class IBKRMarketData(market_data_interface.IMarketData, ibapi.wrapper.EWrapper):
         del self.req_queue[req_id]
         res = pd.DataFrame(bars).set_index("Time").sort_index()
         res = res.loc[slice(start, None, None)]
+        res.index = res.index.tz_localize("America/New_York")
         return res
 
     def historicalData(self, reqId: int, bar: BarData):
@@ -155,7 +156,6 @@ class IBKRMarketData(market_data_interface.IMarketData, ibapi.wrapper.EWrapper):
             loop.call_soon_threadsafe(queue.put_nowait, None)
 
     def error(self, reqId: TickerId, errorCode: int, errorString: str):
-        print("ibkr error (%d) (%d) %s" % (reqId, errorCode, errorString))
         logger.info("ibkr error (%d) (%d) %s", reqId, errorCode, errorString)
         if reqId in self.req_queue:
             loop, queue = self.req_queue[reqId]

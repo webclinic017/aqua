@@ -5,7 +5,7 @@ Alpaca market data
 import logging
 import os
 import urllib.parse
-from typing import Set, Optional
+from typing import Optional, Set
 
 import aiohttp
 import pandas as pd
