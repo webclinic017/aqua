@@ -119,8 +119,7 @@ class IBKRMarketData(market_data_interface.IMarketData, ibapi.wrapper.EWrapper):
         )
         bar_queue = self.req_queue[req_id][1]
         bars = list()
-        bar = await bar_queue.get()
-        while bar is not None:
+        while (bar := await bar_queue.get()) is not None:
             if isinstance(bar, Exception):
                 raise bar
             if isinstance(bar, BarData):
@@ -138,12 +137,13 @@ class IBKRMarketData(market_data_interface.IMarketData, ibapi.wrapper.EWrapper):
             else:
                 logger.error("req queue received unexpected type: %s", type(bar))
                 raise errors.DataSourceError
-            bar = await bar_queue.get()
         del self.req_queue[req_id]
         res = pd.DataFrame(bars).set_index("Time").sort_index()
         res = res.loc[slice(start, None, None)]
         res.index = res.index.tz_localize("America/New_York")
         return res
+
+    # EWrapper methods
 
     def historicalData(self, reqId: int, bar: BarData):
         if reqId in self.req_queue:
