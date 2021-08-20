@@ -58,6 +58,9 @@ class Option:
         self.parity = parity
         self.option_type = option_type
 
+    def __hash__(self):
+        return hash(self._as_tuple())
+
     def __eq__(self, other):
         if isinstance(other, Option):
             return self._as_tuple() == other._as_tuple()
@@ -67,9 +70,6 @@ class Option:
         if isinstance(other, Option):
             return self._as_tuple() < other._as_tuple()
         return NotImplemented
-
-    def __hash__(self):
-        return hash(self._as_tuple())
 
     def _as_tuple(self) -> tuple[Union[Stock], pd.Timestamp, float, Parity, Type]:
         return (
