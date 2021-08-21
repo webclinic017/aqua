@@ -6,10 +6,11 @@ from typing import Union
 
 import pandas as pd
 
+from aqua.security.security import Security
 from aqua.security.stock import Stock
 
 
-class Option:
+class Option(Security):
     """
     A generic option for any underlying.
     """

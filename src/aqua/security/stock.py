@@ -2,8 +2,10 @@
 Defines a stock contract
 """
 
+from aqua.security.security import Security
 
-class Stock:
+
+class Stock(Security):
     """
     A stock represents a share of a company or index.
     We assume that it can be uniquely defined by a symbol (ticker).
