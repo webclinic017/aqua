@@ -28,7 +28,7 @@ class Strategy:
     def __add__(self, other):
         if isinstance(other, Strategy):
             tot_pos = defaultdict(float, self.positions)
-            for con, qty in other.positions:
+            for con, qty in other.positions.items():
                 tot_pos[con] += qty
             name = f"{self.name} + {other.name}"
             return Strategy(name, dict(tot_pos))
