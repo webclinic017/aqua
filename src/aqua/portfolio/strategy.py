@@ -23,6 +23,7 @@ class Strategy:
         self.positions = positions
         if self.positions is None:
             self.positions = dict()
+        self._prune()
 
     def __add__(self, other):
         if isinstance(other, Strategy):
@@ -41,7 +42,14 @@ class Strategy:
     def __setitem__(self, key, value):
         if not isinstance(key, Security):
             raise TypeError(f"Expected key to be Security type. Got type {type(key)}")
-        self.positions[key] = float(value)
+        value = float(value)
+        if value != 0:
+            self.positions[key] = value
+        else:
+            del self.positions[key]
+
+    def __delitem__(self, key):
+        del self.positions[key]
 
     def _prune(self):
         self.positions = {
