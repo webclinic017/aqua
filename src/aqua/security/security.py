@@ -16,3 +16,7 @@ class Security(ABC):
     @abstractmethod
     def __eq__(self, other):
         pass
+
+    @abstractmethod
+    def __repr__(self):
+        pass

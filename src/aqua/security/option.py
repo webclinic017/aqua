@@ -30,6 +30,12 @@ class Option(Security):
                 return self == Option.Parity.CALL and other == Option.Parity.PUT
             return NotImplemented
 
+        def __repr__(self):
+            return {
+                Option.Parity.CALL: "Call",
+                Option.Parity.PUT: "PUT",
+            }[self]
+
     class Type(Enum):
         """
         American or European option
@@ -44,6 +50,12 @@ class Option(Security):
             if isinstance(other, Option.Type):
                 return self == Option.Type.AMERICAN and other == Option.Type.EUROPEAN
             return NotImplemented
+
+        def __repr__(self):
+            return {
+                Option.Type.AMERICAN: "American",
+                Option.Type.EUROPEAN: "European",
+            }[self]
 
     def __init__(
         self,
@@ -67,10 +79,11 @@ class Option(Security):
             return self._as_tuple() == other._as_tuple()
         return NotImplemented
 
-    def __lt__(self, other):
-        if isinstance(other, Option):
-            return self._as_tuple() < other._as_tuple()
-        return NotImplemented
+    def __repr__(self):
+        return (
+            f"{self.underlying} {self.expiration.strftime('%b %d, %Y')} ${self.strike} "
+            f"{self.parity!r} ({self.option_type!r})"
+        )
 
     def _as_tuple(self) -> tuple[Union[Stock], pd.Timestamp, float, Parity, Type]:
         return (

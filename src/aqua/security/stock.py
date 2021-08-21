@@ -25,4 +25,4 @@ class Stock(Security):
         return hash(self.symbol)
 
     def __repr__(self) -> str:
-        return f"stock: {self.symbol}"
+        return self.symbol
