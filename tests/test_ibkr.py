@@ -8,6 +8,7 @@ from aqua.security import Option, Stock
 
 @pytest.mark.asyncio
 @pytest.mark.market_data
+@pytest.mark.ibkr
 async def test_get_option_prices():
     async with IBKRMarketData() as market_data:
         res = await market_data.get_option_bar_history(

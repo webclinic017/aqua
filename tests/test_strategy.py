@@ -1,4 +1,5 @@
 # pylint: disable=missing-module-docstring, missing-function-docstring
+import pytest
 import pandas as pd
 
 from aqua.portfolio.strategy import Strategy
@@ -27,6 +28,19 @@ def test_add_position():
     assert strat[option] == -1
 
 
+def test_del_position():
+    strat = Strategy(positions={
+        Stock("AAPL"): 6
+    })
+    strat[Stock("AAPL")] = 0
+    assert Stock("AAPL") not in strat.positions
+    strat = Strategy(positions={
+        Stock("AAPL"): 6
+    })
+    del strat[Stock("AAPL")]
+    assert Stock("AAPL") not in strat.positions
+
+
 def test_add_strategy():
     option = Option(
         Stock("AAPL"),
@@ -46,3 +60,13 @@ def test_add_strategy():
     strat = strat1 + strat2
     assert strat[Stock("AAPL")] == 8
     assert strat[option] == 4
+
+
+def test_type_error():
+    strat = Strategy()
+    with pytest.raises(TypeError):
+        strat["foo"] = 5
+    with pytest.raises(TypeError):
+        del strat["foo"]
+    with pytest.raises(TypeError):
+        _ = strat["foo"]

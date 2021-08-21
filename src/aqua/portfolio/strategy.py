@@ -49,6 +49,8 @@ class Strategy:
             del self.positions[key]
 
     def __delitem__(self, key):
+        if not isinstance(key, Security):
+            raise TypeError(f"Expected key to be Security type. Got type {type(key)}")
         del self.positions[key]
 
     def _prune(self):

@@ -25,11 +25,6 @@ class Option(Security):
         CALL = auto()
         PUT = auto()
 
-        def __lt__(self, other):
-            if isinstance(other, Option.Parity):
-                return self == Option.Parity.CALL and other == Option.Parity.PUT
-            return NotImplemented
-
         def __repr__(self):
             return {
                 Option.Parity.CALL: "Call",
@@ -45,11 +40,6 @@ class Option(Security):
 
         AMERICAN = auto()
         EUROPEAN = auto()
-
-        def __lt__(self, other):
-            if isinstance(other, Option.Type):
-                return self == Option.Type.AMERICAN and other == Option.Type.EUROPEAN
-            return NotImplemented
 
         def __repr__(self):
             return {
