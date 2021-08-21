@@ -15,6 +15,16 @@ class IMarketData:
     Base class for market data.
     """
 
+    async def __aenter__(self):
+        """
+        Sets up the market data connections
+        """
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        """
+        Closes market data connections
+        """
+
     async def get_stocks_by_symbol(self, symbol: str) -> Set[Stock]:
         """
         Searches for a set of stocks with a given symbol.
