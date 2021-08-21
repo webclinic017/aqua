@@ -12,3 +12,5 @@ This module contains a portfolio manager, which
 2. creates/deletes strategies within the portfolio
 3. uses an "order engine" to place and track orders within each strategy
 """
+from aqua.portfolio.portfolio import Portfolio
+from aqua.portfolio.strategy import Strategy
