@@ -6,6 +6,7 @@ made under the same guiding principles (i.e. the trading strategy).
 from collections import defaultdict
 from typing import Optional
 
+from aqua.security import Option, Stock
 from aqua.security.security import Security
 
 
@@ -20,10 +21,16 @@ class Strategy:
         positions: Optional[dict[Security, float]] = None,
     ):
         self.name = name
-        self.positions = positions
-        if self.positions is None:
-            self.positions = dict()
-        self._prune()
+        if positions is None:
+            positions = dict()
+        self.positions: dict[Security, float] = {}
+        for sec, qty in positions.items():
+            if not isinstance(sec, Security):
+                raise TypeError(f"Expected security. Got {type(sec)}")
+            qty = float(qty)
+            if qty == 0:
+                continue
+            self.positions[sec] = qty
 
     def __add__(self, other):
         if isinstance(other, Strategy):
@@ -53,7 +60,22 @@ class Strategy:
             raise TypeError(f"Expected key to be Security type. Got type {type(key)}")
         del self.positions[key]
 
-    def _prune(self):
-        self.positions = {
-            key: value for key, value in self.positions.items() if value != 0
-        }
+    def __repr__(self):
+        def _security_sort_key(sec: Security) -> str:
+            if isinstance(sec, Stock):
+                return sec.symbol
+            if isinstance(sec, Option):
+                return f"{sec.underlying.symbol} {sec.expiration.strftime('%Y%m%d')}"
+            return ""
+
+        lines = []
+        positions = sorted(self.positions.keys(), key=_security_sort_key)
+        max_len = max(map(lambda x: len(repr(x)), positions))
+        for pos in positions:
+            sec_repr = repr(pos)
+            qty = self.positions[pos]
+            lines.append(f"{sec_repr.rjust(max_len)} : {qty}")
+        if len(self.name) > 0:
+            max_len = max(map(len, lines), default=0)
+            lines.insert(0, self.name.center(max(len(self.name), max_len), "-"))
+        return "\n".join(lines)

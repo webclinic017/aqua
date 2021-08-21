@@ -60,3 +60,10 @@ def test_type_error():
         del strat["foo"]
     with pytest.raises(TypeError):
         _ = strat["foo"]
+    with pytest.raises(TypeError):
+        Strategy(positions={"foo": 5})
+
+
+def test_empty_position():
+    strat = Strategy(positions={Stock("AAPL"): 0})
+    assert strat[Stock("AAPL")] == 0

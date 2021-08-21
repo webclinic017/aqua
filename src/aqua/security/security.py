@@ -11,12 +11,12 @@ class Security(ABC):
 
     @abstractmethod
     def __hash__(self):
-        pass
+        raise NotImplementedError
 
     @abstractmethod
     def __eq__(self, other):
-        pass
+        raise NotImplementedError
 
     @abstractmethod
     def __repr__(self):
-        pass
+        raise NotImplementedError
