@@ -115,6 +115,8 @@ def security_to_ibkr_contract(
     @return: an ibapi Contract or None if conversion can't be made
     """
     con = ibapi.contract.Contract()
+    con.exchange = "SMART"
+    con.currency = "USD"
     if isinstance(sec, Stock):
         con.secType = "STK"
         con.symbol = sec.symbol
@@ -127,6 +129,6 @@ def security_to_ibkr_contract(
             con.right = "C"
         elif sec.parity == Option.Parity.PUT:
             con.right = "P"
-        con.exchange = "SMART"
-        con.currency = "USD"
+    else:
+        return None
     return con

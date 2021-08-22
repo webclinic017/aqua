@@ -12,7 +12,8 @@ from ibapi.common import BarData, TickerId
 
 from aqua.internal.ibkr import IBKRBase, security_to_ibkr_contract
 from aqua.market_data import errors, market_data_interface
-from aqua.security import Option
+from aqua.security import Option, Stock
+from aqua.security.security import Security
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +41,17 @@ class IBKRMarketData(IBKRBase, market_data_interface.IMarketData):
         self.req_id = 0
         self.req_queue: dict[int, asyncio.Queue] = {}
 
+    async def get_stock_bar_history(
+        self,
+        stock: Stock,
+        start: pd.Timestamp,
+        end: pd.Timestamp,
+        bar_size: pd.Timedelta,
+    ) -> pd.DataFrame:
+        res = await self._get_contract_bar_history(stock, start, end, bar_size)
+        res["Volume"] *= 100
+        return res
+
     async def get_option_bar_history(
         self,
         option: Option,
@@ -47,7 +59,16 @@ class IBKRMarketData(IBKRBase, market_data_interface.IMarketData):
         end: pd.Timestamp,
         bar_size: pd.Timedelta,
     ) -> pd.DataFrame:
-        con = security_to_ibkr_contract(option)
+        return await self._get_contract_bar_history(option, start, end, bar_size)
+
+    async def _get_contract_bar_history(
+        self,
+        security: Security,
+        start: pd.Timestamp,
+        end: pd.Timestamp,
+        bar_size: pd.Timedelta,
+    ) -> pd.DataFrame:
+        con = security_to_ibkr_contract(security)
         duration_str = _time_delta_to_duration_str(end - start)
         bar_size_str = _time_delta_to_bar_size_str(bar_size)
         self.req_id += 1
@@ -72,7 +93,7 @@ class IBKRMarketData(IBKRBase, market_data_interface.IMarketData):
             if isinstance(bar, BarData):
                 bars.append(
                     {
-                        "Time": pd.to_datetime(bar.date, format="%Y%m%d  %H:%M:%S"),
+                        "Time": bar.date,
                         "Open": bar.open,
                         "High": bar.high,
                         "Low": bar.low,
@@ -86,7 +107,12 @@ class IBKRMarketData(IBKRBase, market_data_interface.IMarketData):
                 logger.error("req queue received unexpected type: %s", type(bar))
                 raise errors.DataSourceError
         del self.req_queue[self.req_id]
-        res = pd.DataFrame(bars).set_index("Time").sort_index()
+        res = pd.DataFrame(bars)
+        try:
+            res["Time"] = pd.to_datetime(res["Time"], format="%Y%m%d  %H:%M:%S")
+        except ValueError:
+            res["Time"] = pd.to_datetime(res["Time"], format="%Y%m%d")
+        res = res.set_index("Time").sort_index()
         res = res.loc[slice(start, None, None)]
         res.index = res.index.tz_localize("America/New_York")
         return res
