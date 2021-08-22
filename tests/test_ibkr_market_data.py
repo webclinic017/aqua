@@ -19,10 +19,10 @@ async def test_get_option_prices():
                 Option.Parity.CALL,
                 Option.Type.AMERICAN,
             ),
-            pd.Timestamp("2021-08-10"),
-            pd.Timestamp("2021-08-13"),
-            pd.Timedelta(1, unit="hr"),
+            pd.Timestamp("2021-08-15"),
+            pd.Timestamp("2021-08-20"),
+            pd.Timedelta(4, unit="hr"),
         )
         assert not res.empty
-        assert res.index.min() <= pd.Timestamp("2021-08-11", tz="America/New_York")
-        assert res.index.max() >= pd.Timestamp("2021-08-12", tz="America/New_York")
+        assert res.index.min() >= pd.Timestamp("2021-08-15", tz="America/New_York")
+        assert res.index.max() <= pd.Timestamp("2021-08-20", tz="America/New_York")

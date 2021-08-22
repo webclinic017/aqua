@@ -50,6 +50,7 @@ class IBKRMarketData(IBKRBase, market_data_interface.IMarketData):
         con = security_to_ibkr_contract(option)
         duration_str = _time_delta_to_duration_str(end - start)
         bar_size_str = _time_delta_to_bar_size_str(bar_size)
+        self.req_id += 1
         self.req_queue[self.req_id] = asyncio.Queue()
         self.client.reqHistoricalData(
             self.req_id,
@@ -78,6 +79,7 @@ class IBKRMarketData(IBKRBase, market_data_interface.IMarketData):
                         "Close": bar.close,
                         "Volume": bar.volume,
                         "NumTrades": bar.barCount,
+                        "VWAP": bar.average,
                     }
                 )
             else:
