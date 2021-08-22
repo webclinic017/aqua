@@ -1,6 +1,7 @@
 [run]
 omit =
     src/aqua/market_data/*
+    src/aqua/broker/*
     src/aqua/internal/ibkr.py
 
 [report]

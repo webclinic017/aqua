@@ -37,6 +37,8 @@ class Portfolio:
         return pos
 
     def __getitem__(self, item) -> Strategy:
+        if not isinstance(item, str):
+            raise TypeError(f"Expected string. Got {type(item)}")
         return self.strategies[item]
 
     def __setitem__(self, key, value):
