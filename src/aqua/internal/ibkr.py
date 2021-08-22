@@ -104,3 +104,29 @@ def ibkr_contract_to_security(
             Option.Type.AMERICAN,  # TODO: detect American or European
         )
     return None
+
+
+def security_to_ibkr_contract(
+    sec: security.Security,
+) -> Optional[ibapi.contract.Contract]:
+    """
+    Converts an aqua Security to an ibapi Contract
+    @param sec: the aqua Security to convert
+    @return: an ibapi Contract or None if conversion can't be made
+    """
+    con = ibapi.contract.Contract()
+    if isinstance(sec, Stock):
+        con.secType = "STK"
+        con.symbol = sec.symbol
+    elif isinstance(sec, Option):
+        con.secType = "OPT"
+        con.symbol = sec.underlying.symbol
+        con.lastTradeDateOrContractMonth = sec.expiration.strftime("%Y%m%d")
+        con.strike = sec.strike
+        if sec.parity == Option.Parity.CALL:
+            con.right = "C"
+        elif sec.parity == Option.Parity.PUT:
+            con.right = "P"
+        con.exchange = "SMART"
+        con.currency = "USD"
+    return con

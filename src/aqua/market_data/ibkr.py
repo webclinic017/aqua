@@ -6,15 +6,11 @@ import logging
 import os
 from typing import Optional
 
-import ibapi.client
-import ibapi.contract
-import ibapi.errors
-import ibapi.wrapper
 import pandas as pd
 from dotenv import load_dotenv
 from ibapi.common import BarData, TickerId
 
-from aqua.internal.ibkr import IBKRBase
+from aqua.internal.ibkr import IBKRBase, security_to_ibkr_contract
 from aqua.market_data import errors, market_data_interface
 from aqua.security import Option
 
@@ -40,7 +36,7 @@ class IBKRMarketData(IBKRBase, market_data_interface.IMarketData):
     """
 
     def __init__(self):
-        IBKRBase.__init__(self)
+        super().__init__()
         self.req_id = 0
         self.req_queue: dict[int, asyncio.Queue] = {}
 
@@ -51,17 +47,7 @@ class IBKRMarketData(IBKRBase, market_data_interface.IMarketData):
         end: pd.Timestamp,
         bar_size: pd.Timedelta,
     ) -> pd.DataFrame:
-        con = ibapi.contract.Contract()
-        con.symbol = option.underlying.symbol
-        con.secType = "OPT"
-        con.lastTradeDateOrContractMonth = option.expiration.strftime("%Y%m%d")
-        con.strike = option.strike
-        if option.parity == Option.Parity.CALL:
-            con.right = "C"
-        elif option.parity == Option.Parity.PUT:
-            con.right = "P"
-        con.exchange = "SMART"
-        con.currency = "USD"
+        con = security_to_ibkr_contract(option)
         duration_str = _time_delta_to_duration_str(end - start)
         bar_size_str = _time_delta_to_bar_size_str(bar_size)
         self.req_queue[self.req_id] = asyncio.Queue()

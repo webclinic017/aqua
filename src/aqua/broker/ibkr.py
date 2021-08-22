@@ -32,7 +32,7 @@ if _TWS_URL is None or _TWS_PORT is None:
     raise errors.ConfigError
 
 
-class IBKRBroker(IBKRBase, IBroker):
+class IBKRBroker(IBroker, IBKRBase):
     """
     IBKR Broker
     """
