@@ -13,13 +13,16 @@ class Portfolio:
     The portfolio class holds mapping of names to strategies.
     """
 
-    def __init__(self, strategies: Iterable[Strategy]):
+    def __init__(self, strategies: Iterable[Strategy] = None, cash: float = 0):
         self.strategies = {}
+        if strategies is None:
+            strategies = []
         for strat in strategies:
             if strat.name in self.strategies:
                 self.strategies[strat.name] += strat
             else:
                 self.strategies[strat.name] = strat
+        self.cash = cash
 
     @property
     def positions(self) -> dict[Security, float]:
@@ -33,6 +36,16 @@ class Portfolio:
                 pos[sec] += qty
         return pos
 
+    def __getitem__(self, item) -> Strategy:
+        return self.strategies[item]
+
+    def __setitem__(self, key, value):
+        if not isinstance(key, str):
+            raise TypeError(f"Expected string. Got {type(key)}")
+        if not isinstance(value, Strategy):
+            raise TypeError(f"Expected strategy. Got {type(value)}")
+        self.strategies[key] = value
+
     def __repr__(self):
         if len(self.strategies) == 0:
             return ""
@@ -42,5 +55,5 @@ class Portfolio:
         reprs = list(map(repr, strategies))
         max_len = max(map(lambda x: max(map(len, x.split("\n")), default=0), reprs))
         separator = "\n" + "=" * max_len + "\n"
-        res = separator.join(reprs)
+        res = separator.join(reprs + [f"Cash: {self.cash:.2f}"])
         return res

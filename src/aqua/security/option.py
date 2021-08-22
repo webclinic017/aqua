@@ -71,7 +71,7 @@ class Option(Security):
 
     def __repr__(self):
         return (
-            f"{self.underlying} {self.expiration.strftime('%b %d, %Y')} ${self.strike} "
+            f"{self.underlying} {self.expiration.strftime('%b %d, %Y')} ${self.strike:.2f} "
             f"{self.parity!r} ({self.option_type!r})"
         )
 

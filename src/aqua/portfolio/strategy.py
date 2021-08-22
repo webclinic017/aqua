@@ -17,7 +17,7 @@ class Strategy:
 
     def __init__(
         self,
-        name: str = "",
+        name: str = "default",
         positions: Optional[dict[Security, float]] = None,
     ):
         self.name = name
@@ -53,7 +53,8 @@ class Strategy:
         if value != 0:
             self.positions[key] = value
         else:
-            del self.positions[key]
+            if key in self.positions:
+                del self.positions[key]
 
     def __delitem__(self, key):
         if not isinstance(key, Security):
@@ -74,8 +75,8 @@ class Strategy:
         for pos in positions:
             sec_repr = repr(pos)
             qty = self.positions[pos]
-            lines.append(f"{sec_repr.rjust(max_len)} : {qty}")
-        if len(self.name) > 0:
-            max_len = max(map(len, lines), default=0)
-            lines.insert(0, self.name.center(max(len(self.name), max_len), "-"))
+            lines.append(f"| {sec_repr.rjust(max_len)} : {qty}")
+        max_len = max(map(len, lines), default=0)
+        lines = [f"{x.ljust(max_len)} |" for x in lines]
+        lines.insert(0, self.name.center(max(len(self.name), max_len), "-"))
         return "\n".join(lines)
