@@ -27,12 +27,8 @@ async def test_get_bar_history_for_spy():
             pd.Timedelta(1, unit="day"),
         )
         assert not res.empty
-        assert res.index.min() <= pd.Timestamp(
-            "2020-08-17", tz="America/New_York"
-        )
-        assert res.index.max() >= pd.Timestamp(
-            "2021-08-06", tz="America/New_York"
-        )
+        assert res.index.min() <= pd.Timestamp("2020-08-17", tz="America/New_York")
+        assert res.index.max() >= pd.Timestamp("2021-08-06", tz="America/New_York")
         assert "Open" in res.columns
         assert "High" in res.columns
         assert "Low" in res.columns
