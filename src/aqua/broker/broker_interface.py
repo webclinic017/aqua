@@ -27,8 +27,11 @@ class IBroker(ABC):
     @abstractmethod
     def get_portfolio_updates(self) -> asyncio.Queue[Tuple[Portfolio, pd.Timestamp]]:
         """
-        Returns an asyncio Queue that can be used to query for portfolio updates and the time of
-        the update.
-        @return: An asyncio Queue of tuples (Portfolio, Timestamp)
+        Returns an asyncio Queue that can be queried for Portfolio updates.
+
+        The elements of the queue are tuples (Portfolio, Timestamp) which represents the portfolio
+        updated at the given Timestamp.
+
+        :return: an asyncio Queue
         """
         raise NotImplementedError

@@ -90,8 +90,9 @@ def ibkr_contract_to_security(
 ) -> Optional[security.Security]:
     """
     Converts an ibapi Contract to an aqua Security
-    @param con: ibapi Contract
-    @return: an aqua Security or None if conversion can't be made
+
+    :param con: ibapi Contract
+    :return: an aqua Security or None if conversion can't be made
     """
     if con.secType == "STK":
         return Stock(con.symbol)
@@ -111,8 +112,9 @@ def security_to_ibkr_contract(
 ) -> Optional[ibapi.contract.Contract]:
     """
     Converts an aqua Security to an ibapi Contract
-    @param sec: the aqua Security to convert
-    @return: an ibapi Contract or None if conversion can't be made
+
+    :param sec: the aqua Security to convert
+    :return: an ibapi Contract or None if conversion can't be made
     """
     con = ibapi.contract.Contract()
     con.exchange = "SMART"

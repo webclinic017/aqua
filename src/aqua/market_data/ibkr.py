@@ -140,8 +140,11 @@ class IBKRMarketData(IBKRBase, market_data_interface.IMarketData):
 def _time_delta_to_duration_str(time_delta: pd.Timedelta) -> str:
     """
     Converts a pandas Timedelta to an IBKR duration string.
+
     https://interactivebrokers.github.io/tws-api/historical_bars.html#hd_duration
-    @return: an IBKR compliant duration string (rounded up if necessary)
+
+    :param time_delta: the Timedelta to convert
+    :return: an IBKR compliant duration string (rounded up if necessary)
     """
     seconds = int(time_delta.total_seconds())
     if seconds % (60 * 60 * 24) == 0:
@@ -154,8 +157,11 @@ def _time_delta_to_bar_size_str(  # pylint: disable=too-many-return-statements
 ) -> Optional[str]:
     """
     Converts a pandas Timedelta to an IBKR bar size string.
+
     https://interactivebrokers.github.io/tws-api/historical_bars.html#hd_barsize
-    @return: an IBKR compliant bar size (or None if the time delta is incompatible)
+
+    :param time_delta: the Timedelta to convert
+    :return: an IBKR compliant bar size (or None if the time delta is incompatible)
     """
     if time_delta < pd.Timedelta(1, unit="min"):
         count = int(time_delta.total_seconds())

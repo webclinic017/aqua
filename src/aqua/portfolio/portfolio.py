@@ -28,7 +28,8 @@ class Portfolio:
     def positions(self) -> dict[Security, float]:
         """
         Returns the aggregate positions in a portfolio (across all strategies)
-        @return: a dictionary mapping each position to its quantity
+
+        :return: a dictionary mapping each position to its quantity
         """
         pos = defaultdict(float)
         for strat in self.strategies.values():
