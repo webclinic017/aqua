@@ -2,7 +2,7 @@
 Defines an option contract
 """
 from enum import Enum, auto
-from typing import Union
+from typing import Optional, Union
 
 import pandas as pd
 
@@ -53,7 +53,7 @@ class Option(Security):
         expiration: pd.Timestamp,
         strike: float,
         parity: Parity,
-        option_type: Type,
+        option_type: Optional[Type] = None,
     ):
         self.underlying = underlying
         self.expiration = expiration

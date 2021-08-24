@@ -5,14 +5,16 @@ Polygon.io market data
 import logging
 import os
 import urllib.parse
-from typing import Optional, Set
+from typing import Any, Mapping, Optional, Union
 
 import aiohttp
 import pandas as pd
 from dotenv import load_dotenv
 
 from aqua.market_data import errors, market_data_interface
+from aqua.market_data.market_data_interface import _set_time
 from aqua.security import Stock
+from aqua.security.security import Security
 
 logger = logging.getLogger(__name__)
 
@@ -49,114 +51,132 @@ class PolygonMarketData(market_data_interface.IMarketData):
         await self.session.close()
         self.session = None
 
-    async def get_stocks_by_symbol(self, symbol: str) -> Set[Stock]:
-        path = "/v3/reference/tickers"
-        next_url = (
-            urllib.parse.urljoin(_POLYGON_URL, path)
-            + "?"
-            + urllib.parse.urlencode({"ticker": symbol.upper()})
-        )
-        results = set()
-        while next_url is not None:
-            logger.debug("Loading %s", next_url)
-            async with self.session.get(next_url) as response:
-                if response.status != 200:
-                    raise errors.DataSourceError
-                response = await response.json()
-                for stock in response["results"]:
-                    results.add(Stock(stock["ticker"]))
-                if "next_url" in response:
-                    logger.debug("Found next url")
-                    next_url = response["next_url"]
-                else:
-                    next_url = None
-        return results
+    @property
+    def name(self) -> str:
+        return "Polygon.io"
 
-    async def get_stock_bar_history(
+    async def _get(self, path: str, params: Optional[Mapping[str, str]] = None) -> Any:
+        url = urllib.parse.urljoin(_POLYGON_URL, path)
+        async with self.session.get(url, params=params) as response:
+            if response.status != 200:
+                logger.warning(
+                    "Got error %s, %s", response.status, await response.json()
+                )
+                if response.status == 429:
+                    logger.warning("Rate limited")
+                    raise errors.RateLimitError
+                raise errors.DataSourceError
+            return await response.json()
+
+    async def _get_stock_hist_bars(
         self,
-        stock: Stock,
-        start: pd.Timestamp,
-        end: pd.Timestamp,
-        bar_size: pd.Timedelta,
-    ) -> pd.DataFrame:
-        if bar_size.total_seconds() % pd.Timedelta(1, unit="day").total_seconds() == 0:
-            range_multiplier = bar_size.days
-            units = "day"
-        else:
-            range_multiplier = int(round(bar_size.total_seconds() / 60))
-            units = "minute"
-        raw_res = list()
+        symbol: str,
+        multiplier: int,
+        timespan: str,
+        from_date: str,
+        to_date: str,
+    ) -> Union[pd.DataFrame, type(NotImplemented)]:
+        """Assumes from_date and to_date do not need to be URL escaped"""
+        # https://polygon.io/docs/get_v2_aggs_ticker__stocksTicker__range__multiplier___timespan___from___to__anchor
+        symbol = urllib.parse.quote(symbol)
+        response = await self._get(
+            f"/v2/aggs/ticker/{symbol}/range/{multiplier}/{timespan}/{from_date}/{to_date}",
+            params={
+                "adjusted": "false",
+                "limit": "50000",
+            },
+        )
+        if response["status"] == "DELAYED":
+            raise errors.DataPermissionError
+        if "results" not in response:
+            return pd.DataFrame()
+        return pd.DataFrame(response["results"])
 
-        if units == "day":
-            periods = list(pd.date_range(start, end, freq=pd.DateOffset(days=50000)))
+    async def get_hist_bars(
+        self,
+        security: Security,
+        bar_size: pd.Timedelta,
+        start_date: pd.Timestamp,
+        end_date: Optional[pd.Timestamp] = None,
+    ) -> Union[pd.DataFrame, type(NotImplemented)]:
+        # validate security
+        if not isinstance(security, Stock):
+            logger.warning(
+                "Polygon.io only supports stock historical bars. Got security type: %s",
+                type(security),
+            )
+            return NotImplemented
+        # validate start and end dates
+        if end_date is None:
+            end_date = start_date
+        start_date = _set_time(start_date).floor("D")
+        end_date = _set_time(end_date).floor("D")
+        if end_date < start_date:
+            raise ValueError("End date cannot come before start date")
+        # validate bar_size and generate periods to query based on bar_size
+        if bar_size.value <= 0:
+            raise ValueError(f"Got non positive bar_size: {bar_size}")
+        if bar_size % pd.Timedelta("1 day") == pd.Timedelta(0):
+            range_multiplier = bar_size // pd.Timedelta("1 day")
+            timespan = "day"
+            period_freq = pd.DateOffset(days=50000)
+        elif bar_size % pd.Timedelta("1 min") == pd.Timedelta(0):
+            range_multiplier = bar_size // pd.Timedelta("1 min")
+            timespan = "minute"
+            period_freq = pd.DateOffset(days=75)
         else:
-            assert units == "minute"
-            periods = list(pd.date_range(start, end, freq=pd.DateOffset(days=75)))
-        periods.append(end + pd.DateOffset(days=1))
-        logger.debug("Broke up request into %d periods", len(periods))
+            logger.warning("Bar size %s not supported", bar_size)
+            return NotImplemented
+        periods = list(pd.date_range(start_date, end_date, freq=period_freq))
+        periods.append(end_date + pd.DateOffset(days=1))
+        # make requests for each period
+        res = list()
         for i in range(len(periods) - 1):
             period_start = periods[i]
             period_end = periods[i + 1] - pd.DateOffset(days=1)
-            logger.debug(
-                "Fetching period %s to %s",
+            response = await self._get_stock_hist_bars(
+                security.symbol,
+                range_multiplier,
+                timespan,
                 period_start.strftime("%Y-%m-%d"),
                 period_end.strftime("%Y-%m-%d"),
             )
-            url = (
-                urllib.parse.urljoin(
-                    _POLYGON_URL,
-                    (
-                        "/v2/aggs"
-                        + f"/ticker/{stock.symbol}"
-                        + f"/range/{range_multiplier}/{units}"
-                        + f"/{period_start.strftime('%Y-%m-%d')}"
-                        + f"/{period_end.strftime('%Y-%m-%d')}"
-                    ),
-                )
-                + "?"
-                + urllib.parse.urlencode({"limit": 50000, "adjusted": False})
-            )
-            async with self.session.get(url) as response:
-                if response.status != 200:
-                    logger.warning("Error: %s", await response.json())
-                    raise errors.DataSourceError
-                response = await response.json()
-                if "results" in response:
-                    raw_res.append(pd.DataFrame(response["results"]))
-                else:
-                    logger.info("Got empty response for request %s", url)
-                    raw_res.append(pd.DataFrame())
-
-        raw_res = pd.concat(raw_res)
-        if raw_res.empty:
+            if response is NotImplemented:
+                return NotImplemented
+            if response.empty:
+                continue
+            res.append(response)
+        if len(res) == 0:
             return pd.DataFrame(
                 columns=["Open", "High", "Low", "Close", "Volume", "NumTrades", "VWAP"]
             )
-        raw_res["Time"] = raw_res["t"].map(
+        res = pd.concat(res)
+        res.rename(
+            columns={
+                "c": "Close",
+                "h": "High",
+                "l": "Low",
+                "n": "NumTrades",
+                "o": "Open",
+                "t": "Time",
+                "v": "Volume",
+                "vw": "VWAP",
+            },
+            inplace=True,
+        )
+        res["Time"] = res["Time"].map(
             lambda x: pd.Timestamp(x, unit="ms", tz="America/New_York")
         )
-        raw_res.set_index("Time", inplace=True)
-        res = pd.DataFrame(
-            {
-                "Open": raw_res["o"],
-                "High": raw_res["h"],
-                "Low": raw_res["l"],
-                "Close": raw_res["c"],
-                "Volume": raw_res["v"],
-                "NumTrades": raw_res["n"],
-                "VWAP": raw_res["vw"],
-            }
-        )
-        return res
+        res.set_index("Time", inplace=True)
+        res.sort_index(inplace=True)
+        return res[["Open", "High", "Low", "Close", "Volume", "NumTrades", "VWAP"]]
 
-    async def get_stock_dividends(self, stock: Stock) -> pd.DataFrame:
+    async def get_stock_dividends(
+        self, stock: Stock
+    ) -> Union[pd.DataFrame, type(NotImplemented)]:
         path = f"/v2/reference/dividends/{urllib.parse.quote_plus(stock.symbol)}"
-        url = urllib.parse.urljoin(_POLYGON_URL, path)
-        async with self.session.get(url) as response:
-            if response.status != 200:
-                raise errors.DataSourceError
-            response = await response.json()
-            res = pd.DataFrame(response["results"])
+        response = await self._get(path)
+        res = pd.DataFrame(response["results"])
         res.rename(
             columns={
                 "amount": "Amount",
@@ -168,13 +188,11 @@ class PolygonMarketData(market_data_interface.IMarketData):
         )
         return res[["Amount", "ExDate", "PaymentDate", "RecordDate"]]
 
-    async def get_stock_splits(self, stock: Stock) -> pd.DataFrame:
+    async def get_stock_splits(
+        self, stock: Stock
+    ) -> Union[pd.DataFrame, type(NotImplemented)]:
         path = f"/v2/reference/splits/{urllib.parse.quote_plus(stock.symbol)}"
-        url = urllib.parse.urljoin(_POLYGON_URL, path)
-        async with self.session.get(url) as response:
-            if response.status != 200:
-                raise errors.DataSourceError
-            response = await response.json()
-            res = pd.DataFrame(response["results"])
+        response = await self._get(path)
+        res = pd.DataFrame(response["results"])
         res.rename(columns={"ratio": "Ratio", "exDate": "ExDate"}, inplace=True)
         return res[["Ratio", "ExDate"]]

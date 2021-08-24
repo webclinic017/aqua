@@ -5,14 +5,17 @@ Alpaca market data
 import logging
 import os
 import urllib.parse
-from typing import Optional, Set
+from typing import Any, Iterable, Mapping, Optional, Union
 
 import aiohttp
 import pandas as pd
 from dotenv import load_dotenv
 
 from aqua.market_data import errors, market_data_interface
+from aqua.market_data.alpaca_stream import AlpacaStreamingMarketData
+from aqua.market_data.market_data_interface import _set_time
 from aqua.security import Stock
+from aqua.security.security import Security
 
 logger = logging.getLogger(__name__)
 
@@ -54,64 +57,114 @@ class AlpacaMarketData(market_data_interface.IMarketData):
         await self.session.close()
         self.session = None
 
-    async def get_stocks_by_symbol(self, symbol: str) -> Set[Stock]:
-        path = f"/v2/assets/{urllib.parse.quote_plus(symbol.upper())}"
-        url = urllib.parse.urljoin(_ALPACA_URL, path)
-        async with self.session.get(url) as response:
-            if response.status != 200:
-                raise errors.DataSourceError
-            response = await response.json()
-            if "symbol" in response:
-                return {Stock(response["symbol"])}
-        return set()
+    @property
+    def name(self) -> str:
+        return "Alpaca"
 
-    async def get_stock_bar_history(
-        self,
-        stock: Stock,
-        start: pd.Timestamp,
-        end: pd.Timestamp,
-        bar_size: pd.Timedelta,
-    ) -> pd.DataFrame:
-        if bar_size == pd.Timedelta(1, unit="min"):
-            timeframe = "1Min"
-        elif bar_size == pd.Timedelta(1, unit="hr"):
-            timeframe = "1Hour"
-        elif bar_size == pd.Timedelta(1, unit="day"):
-            timeframe = "1Day"
-        else:
-            raise ValueError(
-                "Alpaca only supports bar sizes of 1 min, 1 hour, or 1 day"
-            )
-        end += bar_size  # make sure we include the last bar
-        if start.tz is None:
-            start = start.tz_localize("America/New_York")
-        if end.tz is None:
-            end = end.tz_localize("America/New_York")
-        path = f"/v2/stocks/{urllib.parse.quote_plus(stock.symbol)}/bars"
-        res = list()
-        url_params = {
-            "start": start.isoformat(),
-            "end": end.isoformat(),
-            "limit": 10000,
-            "timeframe": timeframe,
-        }
-        while url_params is not None:
-            url = (
-                urllib.parse.urljoin(_ALPACA_DATA_URL, path)
-                + "?"
-                + urllib.parse.urlencode(url_params, safe=":")
-            )
-            async with self.session.get(url) as response:
+    async def _get(
+        self, path: str, params: Optional[Mapping[str, str]] = None
+    ) -> Iterable[Any]:
+        url = urllib.parse.urljoin(_ALPACA_DATA_URL, path)
+        if params is None:
+            params = dict()
+        params["limit"] = "10000"
+        responses = list()
+        has_next = True
+        while has_next:
+            async with self.session.get(url, params=params) as response:
                 if response.status != 200:
+                    logger.warning(
+                        "Got error %s: %s", response.status, await response.json()
+                    )
+                    if response.status == 429:
+                        logger.warning("Rate limited")
+                        raise errors.RateLimitError
+                    if response.status == 422:
+                        json = await response.json()
+                        if json.get("code", -1) == 42210000:
+                            # subscription does not permit querying data from the past 15 minutes
+                            raise errors.DataPermissionError
                     raise errors.DataSourceError
                 response = await response.json()
-                if "bars" in response:
-                    res.append(pd.DataFrame(response["bars"]))
+                responses.append(response)
+                next_page_token = response.get("next_page_token", None)
+                if next_page_token is not None:
+                    params["next_page_token"] = next_page_token
                 else:
-                    logger.info("Got empty response for request %s", url)
-                url_params["page_token"] = response["next_page_token"]
-                if url_params["page_token"] is None:
-                    url_params = None
+                    has_next = False
+        return responses
+
+    async def _get_stock_hist_bars(
+        self,
+        symbol: str,
+        start_date: str,
+        end_date: str,
+        timeframe: str,
+    ) -> pd.DataFrame:
+        """Assumes start_date and end_date do not need to be URL escaped"""
+        responses = await self._get(
+            f"/v2/stocks/{urllib.parse.quote(symbol)}/bars",
+            params={"start": start_date, "end": end_date, "timeframe": timeframe},
+        )
+        res = list()
+        for response in responses:
+            if "bars" in response:
+                res.append(pd.DataFrame(response["bars"]))
+        res = pd.concat(res)
+        return res
+
+    async def get_hist_bars(
+        self,
+        security: Security,
+        bar_size: pd.Timedelta,
+        start_date: pd.Timestamp,
+        end_date: Optional[pd.Timestamp] = None,
+    ) -> Union[pd.DataFrame, type(NotImplemented)]:
+        # validate security
+        if not isinstance(security, Stock):
+            logger.warning(
+                "Polygon.io only supports stock historical bars. Got security type: %s",
+                type(security),
+            )
+            return NotImplemented
+        # validate start and end dates
+        if end_date is None:
+            end_date = start_date
+        start_date = _set_time(start_date).floor("D")
+        end_date = _set_time(end_date).floor("D")
+        if end_date < start_date:
+            raise ValueError("End date cannot come before start date")
+        # validate bar_size and generate periods to query based on bar_size
+        if bar_size.value <= 0:
+            raise ValueError(f"Got non positive bar_size: {bar_size}")
+        if bar_size == pd.Timedelta("1 min"):
+            timeframe = "1Min"
+            period_freq = pd.DateOffset(days=10)
+        elif bar_size == pd.Timedelta("1 hr"):
+            timeframe = "1Hour"
+            period_freq = pd.DateOffset(days=600)
+        elif bar_size == pd.Timedelta("1 day"):
+            timeframe = "1Day"
+            period_freq = pd.DateOffset(days=9000)
+        else:
+            logger.warning("Bar size %s not supported", bar_size)
+            return NotImplemented
+        periods = list(pd.date_range(start_date, end_date, freq=period_freq))
+        periods.append(end_date + pd.DateOffset(days=1))
+        # make requests for each period
+        res = list()
+        for i in range(len(periods) - 1):
+            period_start = periods[i]
+            period_end = periods[i + 1] - pd.DateOffset(days=1)
+            response = await self._get_stock_hist_bars(
+                security.symbol,
+                period_start.strftime("%Y-%m-%d"),
+                period_end.strftime("%Y-%m-%d"),
+                timeframe,
+            )
+            if response.empty:
+                continue
+            res.append(response)
         res = pd.concat(res)
         res.rename(
             columns={
@@ -130,3 +183,8 @@ class AlpacaMarketData(market_data_interface.IMarketData):
         res.set_index("Time", inplace=True)
         res.sort_index(inplace=True)
         return res
+
+    def get_streaming_market_data(
+        self,
+    ) -> Union["AlpacaStreamingMarketData", type(NotImplemented)]:
+        return AlpacaStreamingMarketData()

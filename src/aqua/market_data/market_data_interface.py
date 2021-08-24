@@ -3,19 +3,24 @@
 An abstract base class for MarketData instances.
 A MarketData class is used for fetching live and historical market data.
 """
-from typing import Set
+from abc import ABC, abstractmethod
+from typing import Callable, Optional, Set, Union
 
 import pandas as pd
 
-from aqua.security import Option, Stock
+from aqua.security import Stock
+from aqua.security.security import Security
 
 
-class IMarketData:
+class IMarketData(ABC):
     """
-    Base class for market data.
+    Abstract base class for market data. Any functionality that's not supported will return
+    `NotImplemented`.
+
+    All Timestamps without a localized timezone will be treated as America/New_York time.
     """
 
-    async def __aenter__(self):
+    async def __aenter__(self) -> "IMarketData":
         """
         Sets up the market data connections
         """
@@ -25,53 +30,138 @@ class IMarketData:
         Closes market data connections
         """
 
-    async def get_stocks_by_symbol(self, symbol: str) -> Set[Stock]:
-        """
-        Searches for a set of stocks with a given symbol.
-        @return: a set of Stock instances with a given symbol.
-        """
-        return NotImplemented
+    # Metadata
+    # --------
 
-    async def get_stock_bar_history(
+    @property
+    @abstractmethod
+    def name(self) -> str:
+        """Returns a (unique) name for the market data"""
+
+    # Price Data
+    # ----------
+
+    async def get_hist_bars(
         self,
-        stock: Stock,
-        start: pd.Timestamp,
-        end: pd.Timestamp,
+        security: Security,
         bar_size: pd.Timedelta,
-    ) -> pd.DataFrame:
+        start_date: pd.Timestamp,
+        end_date: Optional[pd.Timestamp] = None,
+    ) -> Union[pd.DataFrame, type(NotImplemented)]:
         """
-        Returns the bar history for a particular stock (unadjusted for splits)
-        @return: a pandas DataFrame with columns "Open", "High", "Low", "Close", and "Volume".
-        Note that some market data sources may provide extra columns such as volume weighted
-        average
+        Gets historical bars for trades made on a given security over a time span. The trades
+        are not adjusted for splits or dividends. Note that the start and end dates are inclusive.
+        This means all trades made on `start_date` and `end_date` are considered as part of the
+        aggregation.
+
+        Returns pandas DataFrame with columns "Open", "High", "Low", "Close", "Volume",
+        "NumTrades", and "VWAP". Some data sources may include more columns. If the parameters
+        cannot be satisfied, `NotImplemented` is returned instead.
+
+        The index of the DataFrame marks the start time of each bar.
+
+        :param security: the security to get historical bars for
+        :param start_date: the start date for trades. Note that the Timestamp is first converted
+            to timezone America/New_York (or localized) and then rounded down to the latest day
+            before the timestamp.
+        :param end_date: the end date for trades (inclusive). The same timezone rounding rules for
+            `start_date` applies to `end_date`. If not specified, then the end_date is assumed to
+            be the same as the start date (so only 1 day of data will be fetched)
+        :param bar_size: the duration of each bar
+        :return: a pandas DataFrame with columns "Open", "High", "Low", "Close", "Volume",
+            "NumTrades", and "VWAP" and index "Time". If the data source does not support the
+            parameters specified, `NotImplemented` will be returned instead.
+        :raise ValueError: if `end_date` is before `start_date` or if `bar_size` is not positive
         """
         return NotImplemented
 
-    async def get_stock_dividends(self, stock: Stock) -> pd.DataFrame:
-        """
-        Returns the dividend history of a stock
-        @return: a pandas DataFrame with columns "Amount", "ExDate", "PaymentDate", "RecordDate"
-        """
-        return NotImplemented
-
-    async def get_stock_splits(self, stock: Stock) -> pd.DataFrame:
-        """
-        Returns the split history of a stock
-        @return: a pandas DataFrame with columns "Ratio", "ExDate",
-        """
-        return NotImplemented
-
-    async def get_option_bar_history(
+    def get_streaming_market_data(  # pylint: disable=no-self-use
         self,
-        option: Option,
-        start: pd.Timestamp,
-        end: pd.Timestamp,
-        bar_size: pd.Timedelta,
-    ) -> pd.DataFrame:
+    ) -> Union["IStreamingMarketData", type(NotImplemented)]:
+        """Returns an IStreamingMarketData for live market data (if supported)"""
+        return NotImplemented
+
+    # Fundamental Data
+    # ----------------
+
+    async def get_stock_dividends(
+        self, stock: Stock
+    ) -> Union[pd.DataFrame, type(NotImplemented)]:
         """
-        Returns the bar history of an option
-        @return: a pandas DataFrame with columns "Open", "High", "Low", "Close", and "Volume".
-        Note that some market data sources may provide extra columns such as volume weighted
-        average
+        Returns the dividend history of a stock as a pandas DataFrame
+
+        The DataFrame has columns "Amount", "ExDate", "PaymentDate", and "RecordDate"
+
+        :param stock: the stock to fetch dividends for
+        :return: a pandas DataFrame
         """
         return NotImplemented
+
+    async def get_stock_splits(
+        self, stock: Stock
+    ) -> Union[pd.DataFrame, type(NotImplemented)]:
+        """
+        Returns all stock splits as a pandas DataFrame.
+
+        The DataFrame has columns "Ratio" and "ExDate"
+
+        :param stock: the stock to fetch splits for
+        :return: a pandas DataFrame
+        """
+        return NotImplemented
+
+
+class IStreamingMarketData:
+    """
+    Base class for streaming live market data
+    """
+
+    async def __aenter__(self) -> "IStreamingMarketData":
+        """
+        Sets up the market data connections. This usually creates a websocket connection and
+        authenticates
+        """
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        """
+        Closes market data connections
+        """
+
+    async def subscribe_trades(
+        self, security: Security, callback: Callable[[float, int, pd.Timestamp], None]
+    ) -> Union[bool, type(NotImplemented)]:
+        """
+        Initiates a subscription to a particular security for trades
+
+        :param security: the security to subscribe to
+        :param callback: a callback that takes parameters `trade price`, `trade size`, and
+            `trade time`
+        :return: a bool based on subscription success. returns `NotImplemented` otherwise
+        """
+        return NotImplemented
+
+    async def unsubscribe_trades(
+        self, security: Security
+    ) -> Union[None, type(NotImplemented)]:
+        """
+        Unsubscribes from trades for a security
+
+        :param security: the security to unsubscribe
+        :return: returns None if security supports unsubscribe. returns `NotImplemented` otherwise
+        """
+        return NotImplemented
+
+    @property
+    @abstractmethod
+    async def trade_subscriptions(self) -> Set[Security]:
+        """
+        Returns a set of securities that the market data is subscribed to
+        :return: a set of securities
+        """
+
+
+def _set_time(time: pd.Timestamp) -> pd.Timestamp:
+    """Convert or localize timezone to New York"""
+    if time.tz is None:
+        return time.tz_localize("America/New_York")
+    return time.tz_convert("America/New_York")

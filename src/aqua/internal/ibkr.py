@@ -36,11 +36,14 @@ if _TWS_URL is None or _TWS_PORT is None:
 
 class IBKRBase(ibapi.wrapper.EWrapper):
     """
-    IBKR Broker base class for setting up connections to TWS/IB Gateway
+    IBKR Broker base class for setting up connections to TWS/IB Gateway.
+
+    Any subclass of this class *must* call super() in any of the `EWrapper`
+    methods to ensure proper behavior
     """
 
     def __init__(self, client_id: Optional[int] = None):
-        ibapi.wrapper.EWrapper.__init__(self)
+        super().__init__()
         if client_id is None:
             client_id = 0
         self.client_id = client_id
@@ -102,7 +105,6 @@ def ibkr_contract_to_security(
             pd.to_datetime(con.lastTradeDateOrContractMonth, format="%Y%m%d"),
             con.strike,
             Option.Parity.CALL if con.right.lower()[0] == "c" else Option.Parity.PUT,
-            Option.Type.AMERICAN,  # TODO: detect American or European
         )
     return None
 
