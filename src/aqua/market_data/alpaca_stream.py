@@ -7,7 +7,7 @@ import logging
 import os
 import threading
 import urllib.parse
-from typing import Any, Callable, Mapping, Optional, Set, Union
+from typing import Callable, Optional, Set, Union
 
 import pandas as pd
 import websockets
@@ -78,9 +78,11 @@ class AlpacaStreamingMarketData(market_data_interface.IStreamingMarketData):
         self._msg_event_loop = asyncio.get_event_loop()
         # connect
         url = urllib.parse.urljoin(_ALPACA_DATA_WS_URL, "/v2/iex")
-        self._client = await websockets.connect(url)  # pylint: disable=no-member
+        self._client = self._msg_event_loop.run_until_complete(
+            websockets.connect(url)  # pylint: disable=no-member
+        )
         # receive and parse welcome message
-        msgs = json.loads(await self._client.recv())
+        msgs = json.loads(self._msg_event_loop.run_until_complete(self._client.recv()))
         if len(msgs) != 0:
             logger.warning("Invalid handshake: %s", msgs)
             raise ConnectionError
@@ -89,17 +91,19 @@ class AlpacaStreamingMarketData(market_data_interface.IStreamingMarketData):
             logger.warning("Invalid welcome message: %s", welcome_msg)
             raise ConnectionError
         # send auth details
-        await self._client.send(
-            json.dumps(
-                {
-                    "action": "auth",
-                    "key": _ALPACA_KEY_ID,
-                    "secret": _ALPACA_SECRET_KEY,
-                }
+        self._msg_event_loop.run_until_complete(
+            self._client.send(
+                json.dumps(
+                    {
+                        "action": "auth",
+                        "key": _ALPACA_KEY_ID,
+                        "secret": _ALPACA_SECRET_KEY,
+                    }
+                )
             )
         )
         # parse auth response
-        msgs = json.loads(await self._client.recv())
+        msgs = json.loads(self._msg_event_loop.run_until_complete(self._client.recv()))
         if len(msgs) != 0:
             logger.warning("Invalid handshake: %s", msgs)
             raise ConnectionError

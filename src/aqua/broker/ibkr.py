@@ -53,6 +53,7 @@ class IBKRBroker(IBroker, IBKRBase):
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         await IBKRBase.__aexit__(self, exc_type, exc_val, exc_tb)
+        # TODO: clear portfolio_updates Queue
         self.received_account_event.clear()
         self.account = None
 

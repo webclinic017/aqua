@@ -24,6 +24,7 @@ class IBroker(ABC):
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         raise NotImplementedError
 
+    # TODO: convert this subscription to async
     @abstractmethod
     def get_portfolio_updates(self) -> asyncio.Queue[Tuple[Portfolio, pd.Timestamp]]:
         """
