@@ -5,8 +5,9 @@ import asyncio
 import enum
 from typing import Callable, Optional
 
-from aqua.interface import parser_json, parser_plaintext
+from aqua.interface import parser_plaintext
 from aqua.interface.messages import InputMsg, OutputMsg
+
 
 class Interface:
     """
@@ -50,9 +51,7 @@ class Interface:
         return_id = input_msg.return_id
         req = input_msg.request.lower()
         if req == "ping":
-            await self.announcement_queue.put(
-                OutputMsg(return_id, 0, "pong")
-            )
+            await self.announcement_queue.put(OutputMsg(return_id, 0, "pong"))
         else:
             await self.announcement_queue.put(
                 OutputMsg(return_id, -1, f"unrecognized request: {req}")
@@ -64,11 +63,10 @@ class Interface:
 
         :return: a list of responses to output
         """
-        try:
-            announcement_task = asyncio.create_task(self.announcement_queue.get())
-            output_tasks, _ = await asyncio.wait(
-                [announcement_task], return_when=asyncio.FIRST_COMPLETED
-            )
-            return [self.serialize_output(output_task.result()) for output_task in output_tasks]
-        except asyncio.CancelledError:
-            raise
+        announcement_task = asyncio.create_task(self.announcement_queue.get())
+        output_tasks, _ = await asyncio.wait(
+            [announcement_task], return_when=asyncio.FIRST_COMPLETED
+        )
+        return [
+            self.serialize_output(output_task.result()) for output_task in output_tasks
+        ]

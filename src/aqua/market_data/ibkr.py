@@ -73,6 +73,8 @@ class IBKRMarketData(IBKRBase, market_data_interface.IMarketData):
             )
         duration_str = _time_delta_to_duration_str(end_date - start_date)
         # validate bar_size
+        if bar_size.value <= 0:
+            raise ValueError(f"Got non positive bar_size: {bar_size}")
         bar_size_str = _time_delta_to_bar_size_str(bar_size)
         if bar_size_str is None:
             logger.warning("Bar size %s not supported", bar_size)
@@ -99,7 +101,7 @@ class IBKRMarketData(IBKRBase, market_data_interface.IMarketData):
             keepUpToDate=False,
             chartOptions=[],
         )
-        bars = list()
+        bars = []
         bar_queue = self.req_queue[self.req_id]
         with ExitStack() as exit_stack:
             exit_stack.callback(self.req_queue.__delitem__, self.req_id)

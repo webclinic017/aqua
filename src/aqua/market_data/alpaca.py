@@ -66,9 +66,9 @@ class AlpacaMarketData(market_data_interface.IMarketData):
     ) -> Iterable[Any]:
         url = urllib.parse.urljoin(_ALPACA_DATA_URL, path)
         if params is None:
-            params = dict()
+            params = {}
         params["limit"] = "10000"
-        responses = list()
+        responses = []
         has_next = True
         while has_next:
             async with self.session.get(url, params=params) as response:
@@ -106,7 +106,7 @@ class AlpacaMarketData(market_data_interface.IMarketData):
             f"/v2/stocks/{urllib.parse.quote(symbol)}/bars",
             params={"start": start_date, "end": end_date, "timeframe": timeframe},
         )
-        res = list()
+        res = []
         for response in responses:
             if "bars" in response:
                 res.append(pd.DataFrame(response["bars"]))
@@ -152,7 +152,7 @@ class AlpacaMarketData(market_data_interface.IMarketData):
         periods = list(pd.date_range(start_date, end_date, freq=period_freq))
         periods.append(end_date + pd.DateOffset(days=1))
         # make requests for each period
-        res = list()
+        res = []
         for i in range(len(periods) - 1):
             period_start = periods[i]
             period_end = periods[i + 1] - pd.DateOffset(days=1)

@@ -12,9 +12,7 @@ class InputMsg:  # pylint: disable=too-few-public-methods
             raise ValueError(f"Return id's must be nonnegative. Got {return_id}")
         self.return_id = return_id
         if any(x.isspace() for x in request):
-            raise ValueError(
-                f"Request must not contain any whitespaces. Got {request}"
-            )
+            raise ValueError(f"Request must not contain any whitespaces. Got {request}")
         self.request = request
         for param in params:
             if any(x.isspace() for x in param):

@@ -62,7 +62,7 @@ async def test_server_ping(web_server: WebServer, caplog):
 
     async def connect_client():
         async with websockets.connect(  # pylint: disable=no-member
-                "ws://localhost:4000/"
+            "ws://localhost:4000/"
         ) as websocket:
             await websocket.send("notprod")
             await websocket.recv()

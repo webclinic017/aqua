@@ -22,7 +22,7 @@ class Strategy:
     ):
         self.name = name
         if positions is None:
-            positions = dict()
+            positions = {}
         self.positions: dict[Security, float] = {}
         for sec, qty in positions.items():
             if not isinstance(sec, Security):

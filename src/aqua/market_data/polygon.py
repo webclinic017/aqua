@@ -130,7 +130,7 @@ class PolygonMarketData(market_data_interface.IMarketData):
         periods = list(pd.date_range(start_date, end_date, freq=period_freq))
         periods.append(end_date + pd.DateOffset(days=1))
         # make requests for each period
-        res = list()
+        res = []
         for i in range(len(periods) - 1):
             period_start = periods[i]
             period_end = periods[i + 1] - pd.DateOffset(days=1)
