@@ -168,3 +168,24 @@ async def test_market_data_option(market_data_class, caplog):
         assert len(res) >= 20  # least number of bars to expect
         assert res.index.min().floor("D") == start_date.tz_localize("America/New_York")
         assert res.index.max().floor("D") == end_date.tz_localize("America/New_York")
+
+
+@pytest.mark.asyncio
+async def test_market_data_stream(market_data_class, caplog):
+    caplog.set_level(logging.INFO, logger="aqua")
+    market_data: IMarketData = market_data_class()
+    streaming_market_data = market_data.get_streaming_market_data()
+    if streaming_market_data is NotImplemented:
+        return
+    async with streaming_market_data:
+        await streaming_market_data.subscribe_trades(Stock("SPY"))
+        task = asyncio.create_task(streaming_market_data.get_trade(Stock("SPY")))
+        await asyncio.sleep(1)
+        if not task.done():
+            warnings.warn(UserWarning(f"{market_data.name} got no trades for SPY"))
+            return
+        price, size, trade_time = task.result()
+        assert price > 0
+        assert size > 0
+        assert trade_time < pd.Timestamp.now()
+        await streaming_market_data.unsubscribe_quotes(Stock("SPY"))

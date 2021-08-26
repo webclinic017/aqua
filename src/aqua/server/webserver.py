@@ -12,6 +12,7 @@ from typing import Optional
 
 import websockets
 import websockets.legacy.server
+import websockets.exceptions
 from dotenv import load_dotenv
 
 from aqua.interface import Interface
@@ -120,7 +121,10 @@ class WebServer:
                 output_task = asyncio.Task(interface.output())
                 while True:
                     if msg_task.done():
-                        msg = msg_task.result()
+                        try:
+                            msg = msg_task.result()
+                        except websockets.exceptions.ConnectionClosed:
+                            return
                         msg_task = asyncio.Task(websocket.recv())
                         logger.info("client %d> %s", client_id, msg)
                         await interface.input(msg)

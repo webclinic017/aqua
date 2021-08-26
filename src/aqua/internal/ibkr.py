@@ -67,8 +67,8 @@ class IBKRBase(ibapi.wrapper.EWrapper):
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
-        await self.event_loop.run_in_executor(None, self.client.disconnect)
-        await self.event_loop.run_in_executor(None, self.msg_thread.join)
+        self.client.disconnect()
+        self.msg_thread.join()
         self.msg_thread = None
         self.order_id = None
         self.received_order_event.clear()

@@ -5,8 +5,8 @@ Provides common errors/exceptions for market data sources
 
 class DataSourceError(Exception):
     """
-    Data source error occurs when the data source (polygon, ibkr, etc.)
-    service returns an error for a given request
+    Data source error occurs when the data source (polygon, ibkr, etc.) service returns a response
+    that can't be handled
     """
 
 
