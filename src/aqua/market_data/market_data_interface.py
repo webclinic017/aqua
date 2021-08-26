@@ -4,7 +4,7 @@ An abstract base class for MarketData instances.
 A MarketData class is used for fetching live and historical market data.
 """
 from abc import ABC, abstractmethod
-from typing import Callable, Optional, Set, Union
+from typing import Optional, Set, Tuple, Union
 
 import pandas as pd
 
@@ -128,15 +128,13 @@ class IStreamingMarketData:
         """
 
     async def subscribe_trades(
-        self, security: Security, callback: Callable[[float, int, pd.Timestamp], None]
-    ) -> Union[bool, type(NotImplemented)]:
+        self, security: Security
+    ) -> Union[None, type(NotImplemented)]:
         """
-        Initiates a subscription to a particular security for trades
+        Subscribes to trades made on a security
 
-        :param security: the security to subscribe to
-        :param callback: a callback that takes parameters `trade price`, `trade size`, and
-            `trade time`
-        :return: a bool based on subscription success. returns `NotImplemented` otherwise
+        :param security: security to subscribe to
+        :return: True on success, False otherwise
         """
         return NotImplemented
 
@@ -151,11 +149,67 @@ class IStreamingMarketData:
         """
         return NotImplemented
 
+    async def get_trade(self, security: Security) -> Tuple[float, int, pd.Timestamp]:
+        """
+        Asynchronously gets the next available trade for a security. This method will block until
+        a new trade is received for the given security but only asynchronously (i.e. if no trades
+        are available, it must relinquish control of the event loop somehow)
+
+        :param security:
+        :return: a tuple (trade price, trade size, trade time)
+        :raise ValueError: if the security has not been subscribed to. See method `subscribe_trades`
+        """
+        return NotImplemented
+
     @property
     @abstractmethod
     async def trade_subscriptions(self) -> Set[Security]:
         """
         Returns a set of securities that the market data is subscribed to
+        :return: a set of securities
+        """
+
+    async def subscribe_quotes(
+        self, security: Security
+    ) -> Union[None, type(NotImplemented)]:
+        """
+        Subscribes to quotes made on a security
+
+        :param security: security to subscribe to
+        :return: True on success, False otherwise
+        """
+        return NotImplemented
+
+    async def unsubscribe_quotes(
+        self, security: Security
+    ) -> Union[None, type(NotImplemented)]:
+        """
+        Unsubscribes from quotes for a security
+
+        :param security: the security to unsubscribe
+        :return: returns None if security supports unsubscribe. returns `NotImplemented` otherwise
+        """
+        return NotImplemented
+
+    async def get_quote(
+        self, security: Security
+    ) -> Tuple[Tuple[float, int], Tuple[float, int]]:
+        """
+        Asynchronously gets the next available quote for a security. This method will block until
+        a new quote is received for the given security but only asynchronously (i.e. if no quotes
+        are available, it must relinquish control of the event loop somehow)
+
+        :param security:
+        :return: a tuple ((bid price, bid size), (offer price, offer size))
+        :raise ValueError: if the security has not been subscribed to. See method `subscribe_trades`
+        """
+        return NotImplemented
+
+    @property
+    @abstractmethod
+    async def quote_subscriptions(self) -> Set[Security]:
+        """
+        Returns a set of securities that the market data is subscribed to for quotes
         :return: a set of securities
         """
 
