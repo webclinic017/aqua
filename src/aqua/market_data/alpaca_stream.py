@@ -12,8 +12,8 @@ from typing import Mapping, Optional, Set, Tuple, Union
 import pandas as pd
 import websockets
 import websockets.client
-import websockets.legacy.client
 import websockets.exceptions
+import websockets.legacy.client
 from dotenv import load_dotenv
 
 from aqua.market_data import errors, market_data_interface
@@ -269,5 +269,5 @@ class AlpacaStreamingMarketData(market_data_interface.IStreamingMarketData):
         )
 
     @property
-    def quote_subscriptions(self) -> Set[Security]:
+    async def quote_subscriptions(self) -> Set[Security]:
         return self._quote_subscriptions

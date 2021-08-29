@@ -11,8 +11,8 @@ import threading
 from typing import Optional
 
 import websockets
-import websockets.legacy.server
 import websockets.exceptions
+import websockets.legacy.server
 from dotenv import load_dotenv
 
 from aqua.interface import Interface
