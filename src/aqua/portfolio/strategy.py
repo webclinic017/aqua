@@ -78,5 +78,6 @@ class Strategy:
             lines.append(f"| {sec_repr.rjust(max_len)} : {qty}")
         max_len = max(map(len, lines), default=0)
         lines = [f"{x.ljust(max_len)} |" for x in lines]
+        max_len = max(map(len, lines), default=0)
         lines.insert(0, self.name.center(max(len(self.name), max_len), "-"))
         return "\n".join(lines)

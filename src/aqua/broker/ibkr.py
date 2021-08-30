@@ -45,30 +45,38 @@ class IBKRBroker(IBroker, IBKRBase):
         self.portfolio: Optional[Portfolio] = None
         self.portfolio_updates: Optional[asyncio.Queue] = None
         self.portfolio_updates_done = False
+        self.portfolio_updating = False
 
     async def __aenter__(self):
         await IBKRBase.__aenter__(self)
+        self.portfolio_updates = asyncio.Queue()
+        self.portfolio_updating = False
         await self.received_account_event.wait()
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         await IBKRBase.__aexit__(self, exc_type, exc_val, exc_tb)
-        # TODO: clear portfolio_updates Queue
+        self.portfolio_updates = None
+        self.portfolio_updating = False
         self.received_account_event.clear()
         self.account = None
 
-    def get_portfolio_updates(self) -> asyncio.Queue[Tuple[Portfolio, pd.Timestamp]]:
-        self.portfolio_updates = asyncio.Queue()
+    async def get_portfolio_updates(self) -> Tuple[Portfolio, pd.Timestamp]:
         self.portfolio_updates_done = False
         self.portfolio = Portfolio([Strategy()])
-        self.client.reqAccountUpdates(True, self.account)
-        return self.portfolio_updates
+        if not self.portfolio_updating:
+            self.client.reqAccountUpdates(True, self.account)
+            self.portfolio_updating = True
+        return await self.portfolio_updates.get()
 
     def _got_portfolio_update(self):
         if self.portfolio_updates_done:
             self.event_loop.call_soon_threadsafe(
                 self.portfolio_updates.put_nowait,
-                (copy.deepcopy(self.portfolio), pd.Timestamp.now()),
+                (
+                    copy.deepcopy(self.portfolio),
+                    pd.Timestamp.now(tz="America/New_York"),
+                ),
             )
 
     # EWrapper methods
