@@ -139,13 +139,13 @@ async def test_market_data_option(market_data_class, caplog):
     caplog.set_level(logging.INFO, logger="aqua")
     market_data: IMarketData = market_data_class()
     async with market_data:
-        start_date = pd.Timestamp("2021-08-16")
-        end_date = pd.Timestamp("2021-08-20")
+        start_date = pd.Timestamp("2021-08-23")
+        end_date = pd.Timestamp("2021-08-27")
         res = await perform_request(
             market_data.get_hist_bars(
                 Option(
                     Stock("AAPL"),
-                    pd.Timestamp("2021-08-27"),
+                    pd.Timestamp("2021-09-03"),
                     130,
                     Option.Parity.CALL,
                     Option.Type.AMERICAN,
@@ -183,6 +183,7 @@ async def test_market_data_stream(market_data_class, caplog):
         await asyncio.sleep(1)
         if not task.done():
             warnings.warn(UserWarning(f"{market_data.name} got no trades for SPY"))
+            task.cancel()
             return
         price, size, trade_time = task.result()
         assert price > 0

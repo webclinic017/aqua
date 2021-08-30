@@ -40,6 +40,8 @@ class WebServer:
         self.server_started: Optional[threading.Condition] = None
         self.server: Optional[websockets.legacy.server.Serve] = None
         self.event_loop: Optional[asyncio.AbstractEventLoop] = None
+        self.input_task: Optional[asyncio.Task] = None
+        self.output_task: Optional[asyncio.Task] = None
         self.num_clients = 0
         self.password: Optional[str] = os.getenv("AQUA_WEBSERVER_KEY")
         assert self.password is not None, "Can't find webserver key"
@@ -117,26 +119,32 @@ class WebServer:
                 return
 
             async with Interface() as interface:
-                msg_task = asyncio.Task(websocket.recv())
-                output_task = asyncio.Task(interface.output())
-                while True:
-                    if msg_task.done():
-                        try:
-                            msg = msg_task.result()
-                        except websockets.exceptions.ConnectionClosed:
-                            return
-                        msg_task = asyncio.Task(websocket.recv())
-                        logger.info("client %d> %s", client_id, msg)
-                        await interface.input(msg)
+                self.input_task = asyncio.Task(websocket.recv())
+                self.output_task = asyncio.Task(interface.output())
+                with contextlib.ExitStack() as task_exit_stack:
+                    task_exit_stack.callback(self.input_task.cancel)
+                    task_exit_stack.callback(self.output_task.cancel)
+                    while True:
+                        if self.input_task.done():
+                            try:
+                                msg = self.input_task.result()
+                            except websockets.exceptions.ConnectionClosed:
+                                return
+                            self.input_task = asyncio.Task(websocket.recv())
+                            logger.info(
+                                'client %d> "%s"', client_id, msg.replace("\n", "\\n")
+                            )
+                            await interface.input(msg)
 
-                    if output_task.done():
-                        outputs = output_task.result()
-                        output_task = asyncio.Task(interface.output())
-                        for output in outputs:
-                            logger.info("client %d< %s", client_id, output)
+                        if self.output_task.done():
+                            output = self.output_task.result()
+                            self.output_task = asyncio.Task(interface.output())
+                            logger.info(
+                                'client %d< "%s"', client_id, output.replace("\n", "\\n")
+                            )
                             await websocket.send(output)
 
-                    await asyncio.sleep(0)
+                        await asyncio.sleep(0)
 
     async def _auth(self, websocket: WebSocketType) -> bool:
         """Tries to authenticate and returns true if success, false otherwise"""

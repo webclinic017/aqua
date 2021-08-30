@@ -3,16 +3,19 @@ The Interface implementation
 """
 import asyncio
 import enum
-from typing import Callable, Optional
+from typing import Awaitable, Callable, Optional, Union
 
-from aqua.interface import parser_plaintext
-from aqua.interface.messages import InputMsg, OutputMsg
+from aqua.interface import commands, parser_plaintext
+from aqua.interface.message_types import InputMsg, OutputMsg
 
 
 class Interface:
     """
     Interface can format different message types such as JSON or plaintext. By default, plaintext
     is used for readability.
+
+    It maintains a message queue of `OutputMsg`'s or `Awaitable[OutputMsg]`'s that will be outputted
+    on each successive call to `output(...)`.
     """
 
     class FormatType(enum.Enum):
@@ -32,14 +35,14 @@ class Interface:
         else:
             raise NotImplementedError(f"Unsupported format type: {format_type}")
 
-        self.announcement_queue: Optional[asyncio.Queue[OutputMsg]] = None
+        self.msg_queue: Optional[asyncio.Queue[Union[OutputMsg, Awaitable]]] = None
 
     async def __aenter__(self) -> "Interface":
-        self.announcement_queue = asyncio.Queue()
+        self.msg_queue = asyncio.Queue()
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
-        self.announcement_queue = None
+        self.msg_queue = None
 
     async def input(self, msg: str):
         """
@@ -49,24 +52,21 @@ class Interface:
         """
         input_msg = self.parse_input(msg)
         return_id = input_msg.return_id
-        req = input_msg.request.lower()
-        if req == "ping":
-            await self.announcement_queue.put(OutputMsg(return_id, 0, "pong"))
-        else:
-            await self.announcement_queue.put(
-                OutputMsg(return_id, -1, f"unrecognized request: {req}")
+        cmd = commands.lookup.get(input_msg.request, None)
+        if cmd is None:
+            await self.msg_queue.put(
+                OutputMsg(return_id, -1, f"unrecognized request: {input_msg}")
             )
+            return
+        await cmd(self.msg_queue, input_msg.return_id, *input_msg.params)
 
-    async def output(self) -> list[str]:
+    async def output(self) -> str:
         """
         Asynchronously queries for a list of responses.
 
         :return: a list of responses to output
         """
-        announcement_task = asyncio.create_task(self.announcement_queue.get())
-        output_tasks, _ = await asyncio.wait(
-            [announcement_task], return_when=asyncio.FIRST_COMPLETED
-        )
-        return [
-            self.serialize_output(output_task.result()) for output_task in output_tasks
-        ]
+        msg = await self.msg_queue.get()
+        if not isinstance(msg, OutputMsg):
+            msg = await msg
+        return self.serialize_output(msg)

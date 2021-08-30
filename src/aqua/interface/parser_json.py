@@ -1,5 +1,5 @@
 """JSON interface parser"""
-from aqua.interface.messages import InputMsg, OutputMsg
+from aqua.interface.message_types import InputMsg, OutputMsg
 from aqua.interface.parser import IParser
 
 

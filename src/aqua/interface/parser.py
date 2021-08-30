@@ -3,7 +3,7 @@ Parsers for interface
 """
 from abc import ABC, abstractmethod
 
-from aqua.interface.messages import InputMsg, OutputMsg
+from aqua.interface.message_types import InputMsg, OutputMsg
 
 
 class IParser(ABC):
