@@ -140,7 +140,9 @@ class WebServer:  # pylint: disable=too-many-instance-attributes
                             output = self.output_task.result()
                             self.output_task = asyncio.Task(interface.output())
                             logger.info(
-                                'client %d< "%s"', client_id, output.replace("\n", "\\n")
+                                'client %d< "%s"',
+                                client_id,
+                                output.replace("\n", "\\n"),
                             )
                             await websocket.send(output)
 

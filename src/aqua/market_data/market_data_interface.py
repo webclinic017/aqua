@@ -193,7 +193,7 @@ class IStreamingMarketData:
 
     async def get_quote(
         self, security: Security
-    ) -> Tuple[Tuple[float, int], Tuple[float, int]]:
+    ) -> Tuple[Tuple[float, int], Tuple[float, int], pd.Timestamp]:
         """
         Asynchronously gets the next available quote for a security. This method will block until
         a new quote is received for the given security but only asynchronously (i.e. if no quotes

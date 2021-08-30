@@ -38,7 +38,9 @@ if _ALPACA_KEY_ID is None or _ALPACA_SECRET_KEY is None:
     raise errors.CredentialError
 
 TradeUpdateMsg = Tuple[float, int, pd.Timestamp]
-QuoteUpdateMsg = Tuple[Tuple[float, int], Tuple[float, int]]
+QuoteUpdateMsg = Tuple[
+    Tuple[float, int], Tuple[float, int], pd.Timestamp
+]  # bid, ask, quote time
 
 
 class AlpacaStreamingMarketData(market_data_interface.IStreamingMarketData):
@@ -109,7 +111,7 @@ class AlpacaStreamingMarketData(market_data_interface.IStreamingMarketData):
         self._trade_subscription_locks = defaultdict(asyncio.Lock)
         self._trade_msgs = None
 
-    async def _process_msg(self):
+    async def _process_msg(self):  # pylint: disable=too-many-branches
         try:
             msgs = json.loads(await self._client.recv())
         except websockets.exceptions.ConnectionClosedOK:
@@ -137,10 +139,18 @@ class AlpacaStreamingMarketData(market_data_interface.IStreamingMarketData):
                 for ticker in msg["quotes"]:
                     self._quote_subscriptions.add(Stock(ticker))
             elif msg["T"] == "t":  # trade update
-                self._trade_msgs[Stock(msg["symbol"])].put_nowait(
+                self._trade_msgs[Stock(msg["S"])].put_nowait(
                     (
                         msg["p"],
                         msg["s"],
+                        pd.Timestamp(msg["t"]).tz_convert("America/New_York"),
+                    )
+                )
+            elif msg["T"] == "q":
+                self._quote_msgs[Stock(msg["S"])].put_nowait(
+                    (
+                        (msg["bp"], msg["bs"]),
+                        (msg["ap"], msg["as"]),
                         pd.Timestamp(msg["t"]).tz_convert("America/New_York"),
                     )
                 )

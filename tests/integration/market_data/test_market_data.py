@@ -2,7 +2,6 @@
 """Tests IMarketData implementations"""
 import asyncio
 import logging
-import warnings
 from typing import Any, Awaitable
 
 import pandas as pd
@@ -30,32 +29,28 @@ def test_market_data_name(market_data_class):
 
 
 @pytest.mark.asyncio
-async def test_market_data_connection(market_data_class, caplog):
-    caplog.set_level(logging.INFO, logger="aqua")
+async def test_market_data_connection(market_data_class):
     market_data: IMarketData = market_data_class()
     async with market_data:
         await asyncio.sleep(0.1)
 
 
-async def perform_request(cor: Awaitable, name: str) -> Any:
+async def perform_request(cor: Awaitable) -> Any:
     """Performs an asynchronous market data request and logs warnings or returns result"""
     try:
         res = await cor
         if res is NotImplemented:
-            warnings.warn(
-                UserWarning(f"Market data {name} doesn't support this feature")
-            )
+            pass
         return res
     except errors.RateLimitError:
-        warnings.warn(UserWarning(f"Market data {name} is being rate limited"))
+        pass
     except errors.DataPermissionError:
-        warnings.warn(UserWarning(f"Market data {name} doesn't have permissions"))
+        pass
     return NotImplemented
 
 
 @pytest.mark.asyncio
-async def test_market_data_hist_aapl_daily_bar(market_data_class, caplog):
-    caplog.set_level(logging.INFO, logger="aqua")
+async def test_market_data_hist_aapl_daily_bar(market_data_class):
     market_data: IMarketData = market_data_class()
     async with market_data:
         start_date = pd.Timestamp("2021-08-09")
@@ -63,8 +58,7 @@ async def test_market_data_hist_aapl_daily_bar(market_data_class, caplog):
         res = await perform_request(
             market_data.get_hist_bars(
                 Stock("AAPL"), pd.Timedelta("1 day"), start_date, end_date
-            ),
-            market_data.name,
+            )
         )
         if res is NotImplemented:
             return
@@ -81,8 +75,7 @@ async def test_market_data_hist_aapl_daily_bar(market_data_class, caplog):
 
 
 @pytest.mark.asyncio
-async def test_market_data_hist_aapl_minute_bar(market_data_class, caplog):
-    caplog.set_level(logging.INFO, logger="aqua")
+async def test_market_data_hist_aapl_minute_bar(market_data_class):
     market_data: IMarketData = market_data_class()
     async with market_data:
         start_date = pd.Timestamp("2021-08-20")
@@ -90,8 +83,7 @@ async def test_market_data_hist_aapl_minute_bar(market_data_class, caplog):
         res = await perform_request(
             market_data.get_hist_bars(
                 Stock("AAPL"), pd.Timedelta("1 min"), start_date, end_date
-            ),
-            name=market_data.name,
+            )
         )
         if res is NotImplemented:
             return
@@ -108,8 +100,7 @@ async def test_market_data_hist_aapl_minute_bar(market_data_class, caplog):
 
 
 @pytest.mark.asyncio
-async def test_market_data_today_bar(market_data_class, caplog):
-    caplog.set_level(logging.INFO, logger="aqua")
+async def test_market_data_today_bar(market_data_class):
     market_data: IMarketData = market_data_class()
     async with market_data:
         start_date = pd.Timestamp.now().floor("D")
@@ -117,8 +108,7 @@ async def test_market_data_today_bar(market_data_class, caplog):
         res = await perform_request(
             market_data.get_hist_bars(
                 Stock("AAPL"), pd.Timedelta("1 hr"), start_date, end_date
-            ),
-            name=market_data.name,
+            )
         )
         if res is NotImplemented:
             return
@@ -135,8 +125,7 @@ async def test_market_data_today_bar(market_data_class, caplog):
 
 
 @pytest.mark.asyncio
-async def test_market_data_option(market_data_class, caplog):
-    caplog.set_level(logging.INFO, logger="aqua")
+async def test_market_data_option(market_data_class):
     market_data: IMarketData = market_data_class()
     async with market_data:
         start_date = pd.Timestamp("2021-08-23")
@@ -153,8 +142,7 @@ async def test_market_data_option(market_data_class, caplog):
                 pd.Timedelta("1 hr"),
                 start_date,
                 end_date,
-            ),
-            name=market_data.name,
+            )
         )
         if res is NotImplemented:
             return
@@ -171,22 +159,36 @@ async def test_market_data_option(market_data_class, caplog):
 
 
 @pytest.mark.asyncio
-async def test_market_data_stream(market_data_class, caplog):
-    caplog.set_level(logging.INFO, logger="aqua")
+async def test_market_data_trade_stream(market_data_class):
     market_data: IMarketData = market_data_class()
     streaming_market_data = market_data.get_streaming_market_data()
     if streaming_market_data is NotImplemented:
         return
     async with streaming_market_data:
         await streaming_market_data.subscribe_trades(Stock("SPY"))
-        task = asyncio.create_task(streaming_market_data.get_trade(Stock("SPY")))
-        await asyncio.sleep(1)
-        if not task.done():
-            warnings.warn(UserWarning(f"{market_data.name} got no trades for SPY"))
-            task.cancel()
-            return
-        price, size, trade_time = task.result()
+        price, size, trade_time = await streaming_market_data.get_trade(Stock("SPY"))
         assert price > 0
         assert size > 0
-        assert trade_time < pd.Timestamp.now()
+        assert trade_time < pd.Timestamp.now(tz="America/New_York")
+        await streaming_market_data.unsubscribe_trades(Stock("SPY"))
+
+
+@pytest.mark.asyncio
+async def test_market_data_quote_stream(market_data_class):
+    market_data: IMarketData = market_data_class()
+    streaming_market_data = market_data.get_streaming_market_data()
+    if streaming_market_data is NotImplemented:
+        return
+    async with streaming_market_data:
+        await streaming_market_data.subscribe_quotes(Stock("SPY"))
+        (
+            (bid_price, bid_size),
+            (ask_price, ask_size),
+            quote_time,
+        ) = await streaming_market_data.get_quote(Stock("SPY"))
+        assert bid_price > 0
+        assert bid_size > 0
+        assert ask_price > 0
+        assert ask_size > 0
+        assert quote_time < pd.Timestamp.now(tz="America/New_York")
         await streaming_market_data.unsubscribe_quotes(Stock("SPY"))
