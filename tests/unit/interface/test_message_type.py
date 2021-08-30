@@ -1,7 +1,7 @@
 # pylint: disable=missing-module-docstring, missing-function-docstring
 import pytest
 
-from aqua.interface.message_types import InputMsg, OutputMsg
+from aqua.interface.message_types import InputMsg
 
 
 def test_input_msg_neg_return_id():

@@ -32,7 +32,7 @@ class WebServerCloseCode(enum.Enum):
     INVALID_PATH = 3404
 
 
-class WebServer:
+class WebServer:  # pylint: disable=too-many-instance-attributes
     """WebServer"""
 
     def __init__(self):
