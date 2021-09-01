@@ -1,7 +1,7 @@
 """
 Alpaca market data
 """
-
+import asyncio
 import logging
 import os
 import urllib.parse
@@ -55,6 +55,9 @@ class AlpacaMarketData(market_data_interface.IMarketData):
 
     async def __aexit__(self, *exec_info):
         await self.session.close()
+        await asyncio.sleep(
+            0.25
+        )  # https://docs.aiohttp.org/en/stable/client_advanced.html#graceful-shutdown
         self.session = None
 
     @property

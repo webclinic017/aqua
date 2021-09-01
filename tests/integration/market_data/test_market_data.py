@@ -2,6 +2,7 @@
 """Tests IMarketData implementations"""
 import asyncio
 import logging
+import warnings
 from typing import Any, Awaitable
 
 import pandas as pd
@@ -14,8 +15,21 @@ from aqua.security import Option, Stock
 logger = logging.getLogger(__name__)
 
 
+@pytest.fixture(name="event_loop")
+def create_event_loop():
+    loop = asyncio.new_event_loop()
+    loop.set_debug(True)
+    yield loop
+    if not loop.is_closed():
+        loop.close()
+
+
 @pytest.fixture(
-    params=[AlpacaMarketData, IBKRMarketData, PolygonMarketData],
+    params=[
+        AlpacaMarketData,
+        IBKRMarketData,
+        PolygonMarketData,
+    ],
     name="market_data_class",
 )
 def market_data_class_fixture(request):
@@ -43,9 +57,9 @@ async def perform_request(cor: Awaitable) -> Any:
             pass
         return res
     except errors.RateLimitError:
-        pass
+        warnings.warn(UserWarning("Rate limit error"))
     except errors.DataPermissionError:
-        pass
+        warnings.warn(UserWarning("Data permission error"))
     return NotImplemented
 
 
@@ -159,6 +173,7 @@ async def test_market_data_option(market_data_class):
 
 
 @pytest.mark.asyncio
+@pytest.mark.live
 async def test_market_data_trade_stream(market_data_class):
     market_data: IMarketData = market_data_class()
     streaming_market_data = market_data.get_streaming_market_data()
@@ -174,6 +189,7 @@ async def test_market_data_trade_stream(market_data_class):
 
 
 @pytest.mark.asyncio
+@pytest.mark.live
 async def test_market_data_quote_stream(market_data_class):
     market_data: IMarketData = market_data_class()
     streaming_market_data = market_data.get_streaming_market_data()
