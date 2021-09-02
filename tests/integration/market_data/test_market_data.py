@@ -184,7 +184,9 @@ async def test_market_data_trade_stream(market_data_class):
         price, size, trade_time = await streaming_market_data.get_trade(Stock("SPY"))
         assert price > 0
         assert size > 0
-        assert trade_time < pd.Timestamp.now(tz="America/New_York")
+        assert trade_time <= pd.Timestamp.now(tz="America/New_York") + pd.Timedelta(
+            "1 sec"
+        )
         await streaming_market_data.unsubscribe_trades(Stock("SPY"))
 
 
@@ -206,5 +208,7 @@ async def test_market_data_quote_stream(market_data_class):
         assert bid_size > 0
         assert ask_price > 0
         assert ask_size > 0
-        assert quote_time < pd.Timestamp.now(tz="America/New_York")
+        assert quote_time <= pd.Timestamp.now(tz="America/New_York") + pd.Timedelta(
+            "1 sec"
+        )
         await streaming_market_data.unsubscribe_quotes(Stock("SPY"))

@@ -5,7 +5,7 @@ import asyncio
 import enum
 from typing import Awaitable, Callable, Optional, Union
 
-from aqua.interface import commands, parser_plaintext
+from aqua.interface import parser_plaintext
 from aqua.interface.message_types import InputMsg, OutputMsg
 
 
@@ -37,6 +37,10 @@ class Interface:
 
         self.msg_queue: Optional[asyncio.Queue[Union[OutputMsg, Awaitable]]] = None
 
+        self.lookup: dict[str, Callable[[int, ...], Awaitable[None]]] = {
+            "ping": self._ping
+        }
+
     async def __aenter__(self) -> "Interface":
         self.msg_queue = asyncio.Queue()
         return self
@@ -52,13 +56,13 @@ class Interface:
         """
         input_msg = self.parse_input(msg)
         return_id = input_msg.return_id
-        cmd = commands.lookup.get(input_msg.request, None)
+        cmd = self.lookup.get(input_msg.request, None)
         if cmd is None:
             await self.msg_queue.put(
                 OutputMsg(return_id, -1, f"unrecognized request: {input_msg}")
             )
             return
-        await cmd(self.msg_queue, input_msg.return_id, *input_msg.params)
+        await cmd(input_msg.return_id, *input_msg.params)
 
     async def output(self) -> str:
         """
@@ -70,3 +74,6 @@ class Interface:
         if not isinstance(msg, OutputMsg):
             msg = await msg
         return self.serialize_output(msg)
+
+    async def _ping(self, return_id: int) -> None:
+        await self.msg_queue.put(OutputMsg(return_id, 0, "pong"))
