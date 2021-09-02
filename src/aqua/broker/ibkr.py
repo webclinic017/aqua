@@ -32,13 +32,13 @@ if _TWS_URL is None or _TWS_PORT is None:
     raise errors.ConfigError
 
 
-class IBKRBroker(IBroker, IBKRBase):
+class IBKRBroker(IBKRBase, IBroker):
     """
     IBKR Broker
     """
 
     def __init__(self):
-        super().__init__()
+        IBKRBase.__init__(self, client_id=0)
         self.account: Optional[str] = None
         self.received_account_event = asyncio.Event()
 

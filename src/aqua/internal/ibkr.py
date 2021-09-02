@@ -42,10 +42,8 @@ class IBKRBase(ibapi.wrapper.EWrapper):
     methods to ensure proper behavior
     """
 
-    def __init__(self, client_id: Optional[int] = None):
+    def __init__(self, client_id: int):
         super().__init__()
-        if client_id is None:
-            client_id = 0
         self.client_id = client_id
         self.client = ibapi.client.EClient(self)
         self.msg_thread: Optional[threading.Thread] = None

@@ -13,6 +13,7 @@ from ibapi.common import BarData, TickerId
 
 from aqua.internal.ibkr import IBKRBase, security_to_ibkr_contract
 from aqua.market_data import errors, market_data_interface
+from aqua.market_data.ibkr_stream import IBKRStreamingMarketData
 from aqua.market_data.market_data_interface import _set_time
 from aqua.security.security import Security
 
@@ -38,7 +39,7 @@ class IBKRMarketData(IBKRBase, market_data_interface.IMarketData):
     """
 
     def __init__(self):
-        super().__init__()
+        IBKRBase.__init__(self, client_id=1)
         self.req_id = 0
         self.req_queue: dict[int, asyncio.Queue] = {}
 
@@ -135,6 +136,11 @@ class IBKRMarketData(IBKRBase, market_data_interface.IMarketData):
         res.index = res.index.tz_localize("America/New_York")
         res = res.loc[slice(start_date, None, None)]
         return res
+
+    def get_streaming_market_data(  # pylint: disable=no-self-use
+        self,
+    ) -> Union[market_data_interface.IStreamingMarketData, type(NotImplemented)]:
+        return IBKRStreamingMarketData()
 
     # EWrapper methods
 
