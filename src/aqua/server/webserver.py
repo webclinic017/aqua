@@ -68,9 +68,8 @@ class WebServer:  # pylint: disable=too-many-instance-attributes
         wait_closed = self.event_loop.create_task(self.server.ws_server.wait_closed())
         while not wait_closed.done():
             pass
-        remaining_tasks = asyncio.all_tasks(self.event_loop)
-        for remaining_task in remaining_tasks:
-            remaining_task.cancel("server shutting down")
+        for task in asyncio.all_tasks(self.event_loop):
+            task.cancel("server shutting down")
         self.event_loop.call_soon_threadsafe(self.event_loop.stop)
         self.server_thread.join()
         self.server_thread = None
@@ -97,56 +96,54 @@ class WebServer:  # pylint: disable=too-many-instance-attributes
         def dec_num_clients():
             self.num_clients -= 1
 
+        # check path
+        if path != "/":
+            logger.info("wrong path")
+            await websocket.close(
+                code=WebServerCloseCode.INVALID_PATH.value, reason="path not found"
+            )
+            return
+        # auth
+        if not await self._auth(websocket):
+            logger.info("failed auth")
+            await websocket.close(
+                code=WebServerCloseCode.AUTH_FAILED.value, reason="not authorized"
+            )
+            return
+
         with contextlib.ExitStack() as exit_stack:
-            self.num_clients += 1
-            exit_stack.callback(dec_num_clients)
             client_id = self.num_clients
             logger.info("client %d connected", client_id)
-
-            # check path
-            if path != "/":
-                logger.info("client %d wrong path", client_id)
-                await websocket.close(
-                    code=WebServerCloseCode.INVALID_PATH.value, reason="path not found"
-                )
-                return
-            # auth
-            if not await self._auth(websocket):
-                logger.info("client %d failed auth", client_id)
-                await websocket.close(
-                    code=WebServerCloseCode.AUTH_FAILED.value, reason="not authorized"
-                )
-                return
-
+            self.num_clients += 1
+            exit_stack.callback(dec_num_clients)
             async with Interface() as interface:
                 self.input_task = asyncio.Task(websocket.recv())
                 self.output_task = asyncio.Task(interface.output())
-                with contextlib.ExitStack() as task_exit_stack:
-                    task_exit_stack.callback(self.input_task.cancel)
-                    task_exit_stack.callback(self.output_task.cancel)
-                    while True:
-                        if self.input_task.done():
-                            try:
-                                msg = self.input_task.result()
-                            except websockets.exceptions.ConnectionClosed:
-                                return
-                            self.input_task = asyncio.Task(websocket.recv())
-                            logger.info(
-                                'client %d> "%s"', client_id, msg.replace("\n", "\\n")
-                            )
-                            await interface.input(msg)
+                exit_stack.callback(self.input_task.cancel)
+                exit_stack.callback(self.output_task.cancel)
+                while True:
+                    if self.input_task.done():
+                        try:
+                            msg = self.input_task.result()
+                        except websockets.exceptions.ConnectionClosed:
+                            return
+                        self.input_task = asyncio.Task(websocket.recv())
+                        logger.info(
+                            'client %d > "%s"', client_id, msg.replace("\n", "\\n")
+                        )
+                        await interface.input(msg)
 
-                        if self.output_task.done():
-                            output = self.output_task.result()
-                            self.output_task = asyncio.Task(interface.output())
-                            logger.info(
-                                'client %d< "%s"',
-                                client_id,
-                                output.replace("\n", "\\n"),
-                            )
-                            await websocket.send(output)
+                    if self.output_task.done():
+                        output = self.output_task.result()
+                        self.output_task = asyncio.Task(interface.output())
+                        logger.info(
+                            'client %d < "%s"',
+                            client_id,
+                            output.replace("\n", "\\n"),
+                        )
+                        await websocket.send(output)
 
-                        await asyncio.sleep(0)
+                    await asyncio.sleep(0)
 
     async def _auth(self, websocket: WebSocketType) -> bool:
         """Tries to authenticate and returns true if success, false otherwise"""
