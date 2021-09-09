@@ -9,7 +9,7 @@ import pandas as pd
 import pytest
 
 from aqua.market_data import AlpacaMarketData, IBKRMarketData, PolygonMarketData, errors
-from aqua.market_data.market_data_interface import IMarketData
+from aqua.market_data.market_data_interface import IMarketData, StreamType
 from aqua.security import Option, Stock
 
 logger = logging.getLogger(__name__)
@@ -133,7 +133,7 @@ async def test_market_data_today_bar(market_data_class):
         assert "Volume" in res.columns
         assert "NumTrades" in res.columns
         assert "VWAP" in res.columns
-        assert len(res) >= 7  # least number of bars to expect
+        assert len(res) > 0  # least number of bars to expect
         assert res.index.min().floor("D") == start_date.tz_localize("America/New_York")
         assert res.index.max().floor("D") == end_date.tz_localize("America/New_York")
 
@@ -142,14 +142,14 @@ async def test_market_data_today_bar(market_data_class):
 async def test_market_data_option(market_data_class):
     market_data: IMarketData = market_data_class()
     async with market_data:
-        start_date = pd.Timestamp("2021-08-23")
-        end_date = pd.Timestamp("2021-08-27")
+        start_date = pd.Timestamp("2021-09-01")
+        end_date = pd.Timestamp("2021-09-08")
         res = await perform_request(
             market_data.get_hist_bars(
                 Option(
-                    Stock("AAPL"),
-                    pd.Timestamp("2021-09-03"),
-                    130,
+                    Stock("SPY"),
+                    pd.Timestamp("2021-10-01"),
+                    440,
                     Option.Parity.CALL,
                     Option.Type.AMERICAN,
                 ),
@@ -167,7 +167,7 @@ async def test_market_data_option(market_data_class):
         assert "Volume" in res.columns
         assert "NumTrades" in res.columns
         assert "VWAP" in res.columns
-        assert len(res) >= 20  # least number of bars to expect
+        assert len(res) > 0  # least number of bars to expect
         assert res.index.min().floor("D") == start_date.tz_localize("America/New_York")
         assert res.index.max().floor("D") == end_date.tz_localize("America/New_York")
 
@@ -176,39 +176,49 @@ async def test_market_data_option(market_data_class):
 @pytest.mark.live
 async def test_market_data_trade_stream(market_data_class):
     market_data: IMarketData = market_data_class()
-    streaming_market_data = market_data.get_streaming_market_data()
-    if streaming_market_data is NotImplemented:
-        return
-    async with streaming_market_data:
-        await streaming_market_data.subscribe_trades(Stock("SPY"))
-        price, size, trade_time = await streaming_market_data.get_trade(Stock("SPY"))
-        assert price > 0
-        assert size > 0
-        assert trade_time <= pd.Timestamp.now(tz="America/New_York") + pd.Timedelta(
+    async with market_data:
+        sub = await market_data.subscribe(StreamType.TRADES, Stock("SPY"))
+        if sub is NotImplemented:
+            return
+        event_loop = asyncio.get_running_loop()
+        trade = event_loop.create_task(market_data.get(StreamType.TRADES, Stock("SPY")))
+        await asyncio.sleep(1)
+        if not trade.done():
+            trade.cancel()
+            warnings.warn(UserWarning("Trade not fetched in time"))
+            return
+        assert trade.done()
+        trade = trade.result()
+        assert trade.price > 0
+        assert trade.size > 0
+        assert trade.time <= pd.Timestamp.now(tz="America/New_York") + pd.Timedelta(
             "1 sec"
         )
-        await streaming_market_data.unsubscribe_trades(Stock("SPY"))
+        await market_data.unsubscribe(StreamType.TRADES, Stock("SPY"))
 
 
 @pytest.mark.asyncio
 @pytest.mark.live
 async def test_market_data_quote_stream(market_data_class):
     market_data: IMarketData = market_data_class()
-    streaming_market_data = market_data.get_streaming_market_data()
-    if streaming_market_data is NotImplemented:
-        return
-    async with streaming_market_data:
-        await streaming_market_data.subscribe_quotes(Stock("SPY"))
-        (
-            (bid_price, bid_size),
-            (ask_price, ask_size),
-            quote_time,
-        ) = await streaming_market_data.get_quote(Stock("SPY"))
-        assert bid_price > 0
-        assert bid_size > 0
-        assert ask_price > 0
-        assert ask_size > 0
-        assert quote_time <= pd.Timestamp.now(tz="America/New_York") + pd.Timedelta(
+    async with market_data:
+        sub = await market_data.subscribe(StreamType.QUOTES, Stock("SPY"))
+        if sub is NotImplemented:
+            return
+        event_loop = asyncio.get_running_loop()
+        quote = event_loop.create_task(market_data.get(StreamType.QUOTES, Stock("SPY")))
+        await asyncio.sleep(1)
+        if not quote.done():
+            quote.cancel()
+            warnings.warn(UserWarning("Quote not fetched in time"))
+            return
+        quote = quote.result()
+        assert quote.bid_size > 0 or quote.ask_size > 0
+        if quote.bid_size > 0:
+            assert quote.bid > 0
+        if quote.ask_size > 0:
+            assert quote.ask > 0
+        assert quote.time <= pd.Timestamp.now(tz="America/New_York") + pd.Timedelta(
             "1 sec"
         )
-        await streaming_market_data.unsubscribe_quotes(Stock("SPY"))
+        await market_data.unsubscribe(StreamType.QUOTES, Stock("SPY"))

@@ -11,8 +11,14 @@ import aiohttp
 import pandas as pd
 from dotenv import load_dotenv
 
-from aqua.market_data import errors, market_data_interface
-from aqua.market_data.market_data_interface import _set_time
+from aqua.market_data import errors
+from aqua.market_data.market_data_interface import (
+    IMarketData,
+    Quote,
+    StreamType,
+    Trade,
+    _set_time,
+)
 from aqua.security import Stock
 from aqua.security.security import Security
 
@@ -33,7 +39,7 @@ if _POLYGON_API_KEY is None:
     raise errors.CredentialError
 
 
-class PolygonMarketData(market_data_interface.IMarketData):
+class PolygonMarketData(IMarketData):
     """
     Polygon market data gets market data from polygon.io asynchronously
     """
@@ -173,6 +179,19 @@ class PolygonMarketData(market_data_interface.IMarketData):
         res.set_index("Time", inplace=True)
         res.sort_index(inplace=True)
         return res[["Open", "High", "Low", "Close", "Volume", "NumTrades", "VWAP"]]
+
+    async def subscribe(
+        self, stream_type: StreamType, security: Security
+    ) -> Union[None, type(NotImplemented)]:
+        return NotImplemented
+
+    async def get(
+        self, stream_type: StreamType, security: Security
+    ) -> Union[Quote, Trade]:
+        raise NotImplementedError
+
+    async def unsubscribe(self, stream_type: StreamType, security: Security) -> None:
+        raise NotImplementedError
 
     async def get_stock_dividends(
         self, stock: Stock

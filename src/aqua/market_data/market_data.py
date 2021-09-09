@@ -4,12 +4,12 @@ each data source.
 """
 import contextlib
 import logging
-from typing import Optional, Union
+from typing import Optional, Tuple, Union
 
 import pandas as pd
 
 from aqua.market_data import errors
-from aqua.market_data.market_data_interface import IMarketData, IStreamingMarketData
+from aqua.market_data.market_data_interface import IMarketData, Quote, StreamType, Trade
 from aqua.security import Stock
 from aqua.security.security import Security
 
@@ -19,21 +19,21 @@ _market_data: list[IMarketData] = []
 try:
     from aqua.market_data.alpaca import AlpacaMarketData
 
-    _market_data.append(AlpacaMarketData)
+    _market_data.append(AlpacaMarketData())
 except (errors.ConfigError, errors.CredentialError) as import_exception:
     logger.warning("Can't import Alpaca: %s", import_exception)
 
 try:
     from aqua.market_data.polygon import PolygonMarketData
 
-    _market_data.append(PolygonMarketData)
+    _market_data.append(PolygonMarketData())
 except (errors.ConfigError, errors.CredentialError) as import_exception:
     logger.warning("Can't import Polygon: %s", import_exception)
 
 try:
     from aqua.market_data.ibkr import IBKRMarketData
 
-    _market_data.append(IBKRMarketData)
+    _market_data.append(IBKRMarketData())
 except (errors.ConfigError, errors.CredentialError) as import_exception:
     logger.warning("Can't import IBKR: %s", import_exception)
 
@@ -45,6 +45,9 @@ class MarketData(IMarketData):
 
     def __init__(self):
         self._context = contextlib.AsyncExitStack()
+        self._mkt_data_subscriptions: dict[
+            Tuple[StreamType, Security], IMarketData
+        ] = {}
 
     async def __aenter__(self):
         await self._context.__aenter__()
@@ -53,6 +56,7 @@ class MarketData(IMarketData):
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         await self._context.__aexit__(exc_type, exc_val, exc_tb)
+        self._mkt_data_subscriptions.clear()
 
     @property
     def name(self) -> str:
@@ -80,21 +84,36 @@ class MarketData(IMarketData):
                 logger.info("%s failed get_hist_bar: %s", market_data.name, exception)
         return NotImplemented
 
-    def get_streaming_market_data(
-        self,
-    ) -> Union[IStreamingMarketData, type(NotImplemented)]:
+    async def subscribe(
+        self, stream_type: StreamType, security: Security
+    ) -> Union[None, type(NotImplemented)]:
+        if (stream_type, security) in self._mkt_data_subscriptions:
+            return
         for market_data in _market_data:
             try:
-                res = market_data.get_streaming_market_data()
+                res = await market_data.subscribe(stream_type, security)
                 if res is not NotImplemented:
+                    self._mkt_data_subscriptions[(stream_type, security)] = market_data
                     return res
             except Exception as exception:  # pylint: disable=broad-except
-                logger.info(
-                    "%s failed get_streaming_market_data: %s",
-                    market_data.name,
-                    exception,
-                )
+                logger.info("%s failed subscribe: %s", market_data.name, exception)
         return NotImplemented
+
+    async def get(
+        self, stream_type: StreamType, security: Security
+    ) -> Union[Quote, Trade]:
+        if (stream_type, security) not in self._mkt_data_subscriptions:
+            raise ValueError(f"{security} {stream_type} never subscribed to")
+        return await self._mkt_data_subscriptions[(stream_type, security)].get(
+            stream_type, security
+        )
+
+    async def unsubscribe(self, stream_type: StreamType, security: Security) -> None:
+        if (stream_type, security) not in self._mkt_data_subscriptions:
+            raise ValueError(f"{security} {stream_type} never subscribed to")
+        return await self._mkt_data_subscriptions[(stream_type, security)].unsubscribe(
+            stream_type, security
+        )
 
     async def get_stock_dividends(
         self, stock: Stock
