@@ -22,8 +22,8 @@ class IBKRBroker(IBKRBase, IBroker):
     def __init__(self):
         IBKRBase.__init__(self, client_id=0)
         self.account: Optional[str] = None
-        self.received_account_event = asyncio.Event()
-        self.received_positions_event = asyncio.Event()
+        self.received_account_event: Optional[asyncio.Event] = None
+        self.received_positions_event: Optional[asyncio.Event] = None
         self.positions_queue: Optional[
             asyncio.Queue[Tuple[dict[Security, float], float]]
         ] = None
@@ -31,8 +31,11 @@ class IBKRBroker(IBKRBase, IBroker):
         self.cash_bal: float = 0
 
     async def __aenter__(self):
+        self.received_account_event = asyncio.Event()
         await IBKRBase.__aenter__(self)
         await self.received_account_event.wait()
+
+        self.received_positions_event = asyncio.Event()
         self.positions_queue = asyncio.Queue()
         return self
 
@@ -62,7 +65,7 @@ class IBKRBroker(IBKRBase, IBroker):
         IBKRBase.updateAccountValue(self, key, val, currency, accountName)
         if key == "TotalCashBalance" and currency == "BASE":
             self.cash_bal = float(val)
-            self._got_account_update()
+            self.event_loop.call_soon_threadsafe(self._got_account_update)
 
     def updatePortfolio(  # pylint: disable=too-many-arguments
         self,
@@ -87,13 +90,17 @@ class IBKRBroker(IBKRBase, IBroker):
             accountName,
         )
         sec = ibkr_contract_to_security(contract)
+        if position == 0:
+            if sec in self.positions:
+                del self.positions[sec]
+            return
         self.positions[sec] = position
-        self._got_account_update()
+        self.event_loop.call_soon_threadsafe(self._got_account_update)
 
     def accountDownloadEnd(self, accountName: str):
         IBKRBase.accountDownloadEnd(self, accountName)
         self.event_loop.call_soon_threadsafe(self.received_positions_event.set)
-        self._got_account_update()
+        self.event_loop.call_soon_threadsafe(self._got_account_update)
 
     def managedAccounts(self, accountsList: str):
         IBKRBase.managedAccounts(self, accountsList)
@@ -104,6 +111,4 @@ class IBKRBroker(IBKRBase, IBroker):
     def _got_account_update(self):
         if not self.received_positions_event.is_set():
             return
-        self.event_loop.call_soon_threadsafe(
-            self.positions_queue.put_nowait, (self.positions.copy(), self.cash_bal)
-        )
+        self.positions_queue.put_nowait((self.positions.copy(), self.cash_bal))

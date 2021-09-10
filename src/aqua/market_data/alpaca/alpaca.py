@@ -53,6 +53,7 @@ class AlpacaMarketData(IMarketData):
     def __init__(self):
         self.session: Optional[aiohttp.ClientSession] = None
         self.client: Optional[websockets.legacy.client.WebSocketClientProtocol] = None
+        self.ws_task: Optional[asyncio.Task] = None
         self.trade_subscriptions: dict[Security, asyncio.Queue[Trade]] = {}
         self.quote_subscriptions: dict[Security, asyncio.Queue[Quote]] = {}
 
@@ -64,9 +65,11 @@ class AlpacaMarketData(IMarketData):
             }
         )
         await self._connect_ws()
+        self.ws_task = asyncio.get_running_loop().create_task(self._ws_task())
         return self
 
     async def __aexit__(self, *exec_info):
+        self.ws_task.cancel("socket closed")
         await self.client.close()
         self.client = None
         await self.session.close()
@@ -170,7 +173,7 @@ class AlpacaMarketData(IMarketData):
             return NotImplemented
         await self.client.send(json.dumps(msg))
         while security not in subscription:
-            await self._process_ws_msg()
+            await asyncio.sleep(0)
 
     async def get(
         self, stream_type: StreamType, security: Security
@@ -184,7 +187,7 @@ class AlpacaMarketData(IMarketData):
         if security not in subscription:
             raise ValueError(f"{security} {stream_type} not subscribed to")
         while subscription[security].empty():
-            await self._process_ws_msg()
+            await asyncio.sleep(0)
         return await subscription[security].get()
 
     async def unsubscribe(self, stream_type: StreamType, security: Security) -> None:
@@ -203,7 +206,7 @@ class AlpacaMarketData(IMarketData):
             raise NotImplementedError
         await self.client.send(json.dumps(msg))
         while security in subscription:
-            await self._process_ws_msg()
+            await asyncio.sleep(0)
 
     # private methods
 
@@ -305,6 +308,10 @@ class AlpacaMarketData(IMarketData):
                 )
                 if security in self.quote_subscriptions:
                     await self.quote_subscriptions[security].put(quote)
+
+    async def _ws_task(self):
+        while True:
+            await self._process_ws_msg()
 
     async def _get(
         self, path: str, params: Optional[Mapping[str, str]] = None

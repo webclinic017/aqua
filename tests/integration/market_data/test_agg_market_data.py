@@ -3,7 +3,7 @@ import pytest
 
 from aqua.market_data import MarketData
 from aqua.market_data.market_data_interface import StreamType
-from aqua.security import Stock, Option
+from aqua.security import Option, Stock
 
 
 @pytest.mark.asyncio
