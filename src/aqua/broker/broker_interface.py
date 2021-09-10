@@ -5,9 +5,7 @@ account data or placing orders
 from abc import ABC, abstractmethod
 from typing import Tuple
 
-import pandas as pd
-
-from aqua.portfolio import Portfolio
+from aqua.security.security import Security
 
 
 class IBroker(ABC):
@@ -24,13 +22,26 @@ class IBroker(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def get_portfolio_updates(self) -> Tuple[Portfolio, pd.Timestamp]:
+    async def subscribe(self):
         """
-        Returns an asyncio Queue that can be queried for Portfolio updates.
+        Subscribes to broker account updates
+        :return:
+        """
+        raise NotImplementedError
 
-        The elements of the queue are tuples (Portfolio, Timestamp) which represents the portfolio
-        updated at the given Timestamp.
+    @abstractmethod
+    async def get_positions(self) -> Tuple[dict[Security, float], float]:
+        """
+        Asynchronously fetches a tuple (positions, cash balance) where positions is a mapping
+        from securities to their positions (guaranteed to be nonzero).
+        :return: a tuple (positions, cash balance)
+        """
+        raise NotImplementedError
 
-        :return: an asyncio Queue
+    @abstractmethod
+    async def unsubscribe(self):
+        """
+        Unsubscribes from broker account updates
+        :return:
         """
         raise NotImplementedError

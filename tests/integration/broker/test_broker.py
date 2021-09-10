@@ -15,9 +15,10 @@ def broker_class_fixture(request):
 async def test_broker_portfolio(broker_class):
     broker: IBroker = broker_class()
     async with broker:
-        portfolio, update_time = await broker.get_portfolio_updates()
-        assert "default" in portfolio.strategies
-        assert len(portfolio.positions) > 0
-        assert update_time <= pd.Timestamp.now(tz="America/New_York")
-        print()
-        print(portfolio)
+        await broker.subscribe()
+        positions, cash_bal = await broker.get_positions()
+        assert len(positions) > 0
+        for size in positions.values():
+            assert size != 0
+        print(positions)
+        await broker.unsubscribe()

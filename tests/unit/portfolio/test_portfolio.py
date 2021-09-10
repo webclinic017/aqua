@@ -37,4 +37,4 @@ def test_portfolio_getitem_setitem():
 def test_empty_portfolio():
     portfolio = Portfolio()
     assert portfolio.cash == 0
-    assert len(portfolio.strategies) == 0
+    assert len(portfolio.strategies) == 1

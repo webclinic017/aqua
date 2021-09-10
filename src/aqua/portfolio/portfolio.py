@@ -16,7 +16,7 @@ class Portfolio:
     def __init__(self, strategies: Iterable[Strategy] = None, cash: float = 0):
         self.strategies = {}
         if strategies is None:
-            strategies = []
+            strategies = [Strategy()]
         for strat in strategies:
             if strat.name in self.strategies:
                 self.strategies[strat.name] += strat
