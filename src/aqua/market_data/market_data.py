@@ -49,10 +49,11 @@ class MarketData(IMarketData):
             Tuple[StreamType, Security], IMarketData
         ] = {}
 
-    async def __aenter__(self):
+    async def __aenter__(self) -> IMarketData:
         await self._context.__aenter__()
         for market_data in _market_data:
             await self._context.enter_async_context(market_data)
+        return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         await self._context.__aexit__(exc_type, exc_val, exc_tb)

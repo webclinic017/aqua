@@ -48,11 +48,12 @@ class IBKRBase(ibapi.wrapper.EWrapper):
         self.client = ibapi.client.EClient(self)
         self.msg_thread: Optional[threading.Thread] = None
         self.order_id: Optional[int] = None
-        self.received_order_event = asyncio.Event()
+        self.received_order_event: Optional[asyncio.Event] = None
         self.event_loop: Optional[asyncio.AbstractEventLoop] = None
 
     async def __aenter__(self) -> "IBKRBase":
         self.event_loop = asyncio.get_running_loop()
+        self.received_order_event = asyncio.Event()
         await self.event_loop.run_in_executor(
             None,
             lambda: self.client.connect(_TWS_URL, _TWS_PORT, clientId=self.client_id),
