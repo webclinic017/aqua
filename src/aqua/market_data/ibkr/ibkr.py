@@ -39,13 +39,9 @@ class IBKRMarketData(
         self.hist_bar_req_queue: dict[int, asyncio.Queue] = {}
         self.mkt_data_security_to_req_id: dict[Security, int] = {}
         self.mkt_data_req_id_to_security: dict[int, Security] = {}
-        self.trades: defaultdict[Security, Trade] = defaultdict(
-            lambda: Trade(0, 0, pd.Timestamp.now(tz="America/New_York"))
-        )
+        self.trades: defaultdict[Security, Trade] = defaultdict(Trade)
         self.trade_subscriptions: dict[Security, asyncio.Queue[Trade]] = {}
-        self.quotes: defaultdict[Security, Quote] = defaultdict(
-            lambda: Quote(0, 0, 0, 0, pd.Timestamp.now(tz="America/New_York"))
-        )
+        self.quotes: defaultdict[Security, Quote] = defaultdict(Quote)
         self.quote_subscriptions: dict[Security, asyncio.Queue[Quote]] = {}
 
     async def __aenter__(self):

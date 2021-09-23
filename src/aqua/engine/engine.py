@@ -2,7 +2,6 @@
 Implementation of the main engine class
 """
 import asyncio
-import contextlib
 import logging
 from typing import Optional
 
@@ -24,13 +23,13 @@ class Engine:  # pylint: disable=too-many-instance-attributes
     """
 
     def __init__(self):
-        self._running = False
         self._market_data = MarketData()
         self._broker = IBKRBroker()
 
         self._positions_task: Optional[asyncio.Task] = None
+        self._position_update_lock: Optional[asyncio.Lock] = None
         self.positions: dict[Security, float] = {}
-        self.cash_bal: float = 0
+        self.cash_bal: float = float("nan")
 
         self._quotes_tasks: dict[Security, asyncio.Task[Quote]] = {}
         self.quotes: dict[Security, Quote] = {}
@@ -41,71 +40,46 @@ class Engine:  # pylint: disable=too-many-instance-attributes
             deinit=lambda sec: self._deinit_subscription(StreamType.QUOTES, sec),
         )
 
-    async def run(self):
-        """Starts running the engine, which fetches positions and quotes"""
-        logger.info("starting engine")
+    async def connect(self):
+        """Connects market data and broker"""
+        await self._market_data.__aenter__()
+        await self._broker.__aenter__()
+
+    async def disconnect(self):
+        """Disconnects market data and broker"""
+        await self._market_data.__aexit__(None, None, None)
+        await self._broker.__aexit__(None, None, None)
+
+    async def subscribe_positions(self):
+        """Initiates a subscription to positions represented by broker"""
+        await self._broker.subscribe()
+        self.positions, self.cash_bal = await self._broker.get_positions()
+        for sec in self.positions:
+            await self._quotes_subscriptions.new(sec)
+        self._position_update_lock = asyncio.Lock()
+
+        async def update_loop():
+            while True:
+                prev_pos = self.positions
+                new_positions, new_cash_bal = await self._broker.get_positions()
+                async with self._position_update_lock:
+                    self.positions, self.cash_bal = new_positions, new_cash_bal
+                    await self._process_position_updates(prev_pos)
+
         event_loop = asyncio.get_running_loop()
-        async with contextlib.AsyncExitStack() as exit_stack:
-            logger.info("establishing market data connection")
-            await exit_stack.enter_async_context(self._market_data)
-            logger.info("establishing broker connection")
-            await exit_stack.enter_async_context(self._broker)
+        self._positions_task = event_loop.create_task(update_loop())
 
-            async def cancel_tasks():
-                if self._positions_task is not None:
-                    self._positions_task.cancel()
-                for task in self._quotes_tasks.values():
-                    task.cancel()
-
-            exit_stack.push_async_callback(cancel_tasks)
-
-            await self._broker.subscribe()
-            print("getting positions")
-            self.positions, self.cash_bal = await self._broker.get_positions()
-            await self._process_position_updates({})
-            print(f"got positions: {self.positions}")
-            self._positions_task = event_loop.create_task(self._broker.get_positions())
-            self._running = True
-            print("engine running")
-            try:
-                while self._running:
-                    # update portfolio
-                    if self._positions_task.done():
-                        prev_pos = self.positions
-                        self.positions, self.cash_bal = self._positions_task.result()
-                        self._positions_task = event_loop.create_task(
-                            self._broker.get_positions()
-                        )
-                        await self._process_position_updates(prev_pos)
-
-                    # update quotes
-                    quote_securities = list(self._quotes_tasks.keys())
-                    for security in quote_securities:
-                        if self._quotes_tasks[security].done():
-                            self.quotes[security] = self._quotes_tasks[security].result()
-                            self._quotes_tasks[security] = event_loop.create_task(
-                                self._market_data.get(StreamType.QUOTES, security)
-                            )
-
-                    await asyncio.sleep(0)
-            except Exception as exception:
-                print(f"engine got exception: {exception}")
-
-    def stop(self):
-        """Stops the engine from running"""
-        self._running = False
-
-    def nav(self) -> float:
-        """
-        Returns the net asset value of the portfolio given its securities, cash balance,
-        and mid market prices for the quotes.
-        """
-        nav = self.cash_bal
-        for sec, size in self.positions.items():
-            if sec not in self.quotes:
-                return float("nan")
-            nav += self.quotes[sec].mid_price() * size
-        return nav
+    async def unsubscribe_positions(self):
+        """Unsubscribes from position updates"""
+        if self._positions_task is None:
+            return
+        async with self._position_update_lock:
+            self._positions_task.cancel()
+        for sec in self.positions:
+            await self._quotes_subscriptions.delete(sec)
+        self.positions.clear()
+        self.cash_bal = float("nan")
+        self._positions_task = None
 
     async def _process_position_updates(self, prev_positions: dict[Security, float]):
         assert self.positions is not None
@@ -119,9 +93,13 @@ class Engine:  # pylint: disable=too-many-instance-attributes
     async def _init_subscription(self, stream_type: StreamType, security: Security):
         event_loop = asyncio.get_running_loop()
         await self._market_data.subscribe(stream_type, security)
-        self._quotes_tasks[security] = event_loop.create_task(
-            self._market_data.get(StreamType.QUOTES, security)
-        )
+
+        async def update_loop():
+            while True:
+                quote = await self._market_data.get(StreamType.QUOTES, security)
+                self.quotes[security] = quote
+
+        self._quotes_tasks[security] = event_loop.create_task(update_loop())
 
     async def _deinit_subscription(self, stream_type: StreamType, security: Security):
         self._quotes_tasks[security].cancel()

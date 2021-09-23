@@ -28,7 +28,7 @@ class IBKRBroker(IBKRBase, IBroker):
             asyncio.Queue[Tuple[dict[Security, float], float]]
         ] = None
         self.positions: dict[Security, float] = {}
-        self.cash_bal: float = 0
+        self.cash_bal = float("nan")
 
     async def __aenter__(self):
         self.received_account_event = asyncio.Event()
@@ -46,7 +46,7 @@ class IBKRBroker(IBKRBase, IBroker):
         self.received_positions_event.clear()
         self.positions_queue = None
         self.positions.clear()
-        self.cash_bal = 0
+        self.cash_bal = float("nan")
 
     async def subscribe(self):
         self.client.reqAccountUpdates(True, self.account)
@@ -58,6 +58,9 @@ class IBKRBroker(IBKRBase, IBroker):
     async def unsubscribe(self):
         self.client.reqAccountUpdates(False, self.account)
         self.received_positions_event.clear()
+        self.positions_queue = asyncio.Queue()
+        self.positions.clear()
+        self.cash_bal = float("nan")
 
     # EWrapper methods
 

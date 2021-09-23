@@ -25,24 +25,27 @@ class StreamType(enum.Enum):
 class Trade:
     """A single trade"""
 
-    price: float
-    size: int
-    time: pd.Timestamp
+    price: float = float("nan")
+    size: int = float("nan")
+    time: pd.Timestamp = pd.Timestamp("nat")
 
     def __post_init__(self):
         if self.size < 0:
             raise ValueError("Trade size can't be negative")
+
+    def __repr__(self) -> str:
+        return f"{self.price:.2f} x {self.size}"
 
 
 @dataclass
 class Quote:
     """A single quote"""
 
-    bid: float
-    bid_size: int
-    ask: float
-    ask_size: int
-    time: pd.Timestamp
+    bid: float = float("nan")
+    bid_size: int = float("nan")
+    ask: float = float("nan")
+    ask_size: int = float("nan")
+    time: pd.Timestamp = pd.Timestamp("nat")
 
     def __post_init__(self):
         if self.bid_size < 0 or self.ask_size < 0:
@@ -63,6 +66,9 @@ class Quote:
         return (self.bid * self.ask_size + self.ask * self.bid_size) / (
             self.bid_size + self.ask_size
         )
+
+    def __repr__(self) -> str:
+        return f"{self.bid_size} x {self.bid:.2f} @ {self.ask:.2f} x {self.ask_size}"
 
 
 class IMarketData(ABC):
