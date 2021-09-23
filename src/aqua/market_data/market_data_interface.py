@@ -49,13 +49,17 @@ class Quote:
             raise ValueError(
                 f"Bid and ask size can't be negative. Got {self.bid_size} x {self.ask_size}"
             )
+        if self.bid_size == 0 and self.ask_size == 0:
+            raise ValueError("Bid and ask sizes can't be both 0")
 
     def mid_price(self) -> float:
         """
         Calculates the size weighted mid price of a quote. Returns nan if quote isn't double sided
         """
-        if self.bid_size or self.ask_size == 0:
-            return float("nan")
+        if self.bid_size == 0:
+            return self.ask
+        if self.ask_size == 0:
+            return self.bid
         return (self.bid * self.ask_size + self.ask * self.bid_size) / (
             self.bid_size + self.ask_size
         )
