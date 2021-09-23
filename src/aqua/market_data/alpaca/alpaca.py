@@ -213,6 +213,7 @@ class AlpacaMarketData(IMarketData):
     async def _connect_ws(self):
         # connect
         url = urllib.parse.urljoin(_ALPACA_DATA_WS_URL, "/v2/iex")
+        logger.debug("Connecting to %s", url)
         self.client = await websockets.connect(url)  # pylint: disable=no-member
         # receive and parse welcome message
         msgs = json.loads(await self.client.recv())
@@ -274,7 +275,7 @@ class AlpacaMarketData(IMarketData):
                     self.trade_subscriptions.keys() - trade_subscriptions
                 )
                 for new_trade_subscription in new_trade_subscriptions:
-                    self.trade_subscriptions[new_trade_subscription] = asyncio.Queue()
+                    self.trade_subscriptions[new_trade_subscription] = asyncio.Queue(8)
                 for old_trade_subscription in old_trade_subscriptions:
                     del self.trade_subscriptions[old_trade_subscription]
                 quote_subscriptions = set(Stock(symbol) for symbol in msg["quotes"])
@@ -285,7 +286,7 @@ class AlpacaMarketData(IMarketData):
                     self.quote_subscriptions.keys() - quote_subscriptions
                 )
                 for new_quote_subscription in new_quote_subscriptions:
-                    self.quote_subscriptions[new_quote_subscription] = asyncio.Queue()
+                    self.quote_subscriptions[new_quote_subscription] = asyncio.Queue(8)
                 for old_quote_subscription in old_quote_subscriptions:
                     del self.quote_subscriptions[old_quote_subscription]
             elif msg["T"] == "t":  # trade update
